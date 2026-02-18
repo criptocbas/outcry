@@ -8,7 +8,7 @@ use crate::{
     constants::*,
     errors::OutcryError,
     events::AuctionSettled,
-    state::{AuctionState, AuctionStatus, AuctionVault},
+    state::{AuctionState, AuctionStatus, AuctionVault, BidderDeposit},
 };
 
 #[derive(Accounts)]
@@ -30,6 +30,16 @@ pub struct SettleAuction<'info> {
         bump = auction_vault.bump,
     )]
     pub auction_vault: Account<'info, AuctionVault>,
+
+    /// Winner's deposit PDA — validates they deposited enough
+    #[account(
+        mut,
+        seeds = [DEPOSIT_SEED, auction_state.key().as_ref(), auction_state.highest_bidder.as_ref()],
+        bump = winner_deposit.bump,
+        constraint = winner_deposit.amount >= auction_state.current_bid
+            @ OutcryError::InsufficientDeposit,
+    )]
+    pub winner_deposit: Account<'info, BidderDeposit>,
 
     /// CHECK: Validated against auction_state.seller
     #[account(
@@ -77,14 +87,10 @@ pub fn handle_settle_auction(ctx: Context<SettleAuction>) -> Result<()> {
     let winning_bid = auction.current_bid;
     let winner_key = auction.highest_bidder;
 
-    // Validate winner's deposit covers the winning bid
-    let (winner_idx, winner_deposit) = auction
-        .find_deposit(&winner_key)
-        .ok_or(OutcryError::InsufficientDeposit)?;
-    require!(winner_deposit >= winning_bid, OutcryError::InsufficientDeposit);
-
     // Deduct winning bid from winner's deposit
-    auction.deposits[winner_idx].amount = winner_deposit
+    let winner_deposit = &mut ctx.accounts.winner_deposit;
+    winner_deposit.amount = winner_deposit
+        .amount
         .checked_sub(winning_bid)
         .ok_or(OutcryError::ArithmeticOverflow)?;
 

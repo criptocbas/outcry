@@ -266,8 +266,35 @@
           "signer": true
         },
         {
-          "name": "auction_state",
-          "writable": true
+          "name": "auction_state"
+        },
+        {
+          "name": "bidder_deposit",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "auction_state"
+              },
+              {
+                "kind": "account",
+                "path": "bidder"
+              }
+            ]
+          }
         },
         {
           "name": "auction_vault",
@@ -980,7 +1007,41 @@
         },
         {
           "name": "auction_state",
-          "writable": true
+          "docs": [
+            "The auction this deposit is for. We accept any account here because when",
+            "the AuctionState is delegated to ER, its L1 owner changes to the",
+            "delegation program and Anchor's Account<> deserialization would fail.",
+            "Security: the auction_vault PDA is derived from this key — if a fake",
+            "address is passed, the vault constraint fails."
+          ]
+        },
+        {
+          "name": "bidder_deposit",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "auction_state"
+              },
+              {
+                "kind": "account",
+                "path": "bidder"
+              }
+            ]
+          }
         },
         {
           "name": "auction_vault",
@@ -1158,6 +1219,38 @@
               {
                 "kind": "account",
                 "path": "auction_state"
+              }
+            ]
+          }
+        },
+        {
+          "name": "winner_deposit",
+          "docs": [
+            "Winner's deposit PDA — validates they deposited enough"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "auction_state"
+              },
+              {
+                "kind": "account",
+                "path": "auction_state.highest_bidder",
+                "account": "AuctionState"
               }
             ]
           }
@@ -1486,6 +1579,19 @@
         156,
         96,
         152
+      ]
+    },
+    {
+      "name": "BidderDeposit",
+      "discriminator": [
+        210,
+        248,
+        39,
+        93,
+        167,
+        248,
+        255,
+        48
       ]
     }
   ],
@@ -1915,19 +2021,6 @@
             "type": "u32"
           },
           {
-            "name": "deposits",
-            "docs": [
-              "Bidder deposits — embedded so they travel with delegation to ER"
-            ],
-            "type": {
-              "vec": {
-                "defined": {
-                  "name": "DepositEntry"
-                }
-              }
-            }
-          },
-          {
             "name": "bump",
             "docs": [
               "PDA bump seed"
@@ -2015,20 +2108,41 @@
       }
     },
     {
-      "name": "DepositEntry",
+      "name": "BidderDeposit",
       "docs": [
-        "Deposit entry embedded in AuctionState — travels with account to ER"
+        "Per-bidder deposit tracking — lives on L1, never delegated.",
+        "Seeds: [b\"deposit\", auction_state.key(), bidder.key()]"
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
+            "name": "auction",
+            "docs": [
+              "The auction this deposit is for"
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "bidder",
+            "docs": [
+              "The bidder who deposited"
+            ],
             "type": "pubkey"
           },
           {
             "name": "amount",
+            "docs": [
+              "Total deposited amount (lamports)"
+            ],
             "type": "u64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
           }
         ]
       }

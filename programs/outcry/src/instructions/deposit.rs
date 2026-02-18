@@ -5,7 +5,7 @@ use crate::{
     constants::*,
     errors::OutcryError,
     events::DepositMade,
-    state::{AuctionState, AuctionStatus, AuctionVault, DepositEntry},
+    state::{AuctionVault, BidderDeposit},
 };
 
 #[derive(Accounts)]
@@ -13,14 +13,22 @@ pub struct Deposit<'info> {
     #[account(mut)]
     pub bidder: Signer<'info>,
 
+    /// The auction this deposit is for. We accept any account here because when
+    /// the AuctionState is delegated to ER, its L1 owner changes to the
+    /// delegation program and Anchor's Account<> deserialization would fail.
+    /// Security: the auction_vault PDA is derived from this key — if a fake
+    /// address is passed, the vault constraint fails.
+    /// CHECK: Implicitly validated via auction_vault seeds constraint.
+    pub auction_state: UncheckedAccount<'info>,
+
     #[account(
-        mut,
-        constraint = (
-            auction_state.status == AuctionStatus::Created
-            || auction_state.status == AuctionStatus::Active
-        ) @ OutcryError::InvalidAuctionStatus,
+        init_if_needed,
+        payer = bidder,
+        space = 8 + BidderDeposit::INIT_SPACE,
+        seeds = [DEPOSIT_SEED, auction_state.key().as_ref(), bidder.key().as_ref()],
+        bump,
     )]
-    pub auction_state: Account<'info, AuctionState>,
+    pub bidder_deposit: Account<'info, BidderDeposit>,
 
     #[account(
         mut,
@@ -35,25 +43,22 @@ pub struct Deposit<'info> {
 pub fn handle_deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     require!(amount > 0, OutcryError::InvalidDepositAmount);
 
-    let auction = &mut ctx.accounts.auction_state;
+    let deposit = &mut ctx.accounts.bidder_deposit;
+    let auction_key = ctx.accounts.auction_state.key();
     let bidder_key = ctx.accounts.bidder.key();
 
-    // Find existing deposit or add new entry
-    let total_deposit = if let Some((idx, existing)) = auction.find_deposit(&bidder_key) {
-        let new_amount = existing
-            .checked_add(amount)
-            .ok_or(OutcryError::ArithmeticOverflow)?;
-        auction.deposits[idx].amount = new_amount;
-        new_amount
-    } else {
-        // New bidder — check capacity
-        require!(auction.deposits.len() < MAX_BIDDERS, OutcryError::AuctionFull);
-        auction.deposits.push(DepositEntry {
-            bidder: bidder_key,
-            amount,
-        });
-        amount
-    };
+    // Initialize fields if this is a new deposit account
+    if deposit.auction == Pubkey::default() {
+        deposit.auction = auction_key;
+        deposit.bidder = bidder_key;
+        deposit.bump = ctx.bumps.bidder_deposit;
+    }
+
+    // Update deposit amount
+    deposit.amount = deposit
+        .amount
+        .checked_add(amount)
+        .ok_or(OutcryError::ArithmeticOverflow)?;
 
     // Transfer SOL from bidder to vault
     system_program::transfer(
@@ -68,10 +73,10 @@ pub fn handle_deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     )?;
 
     emit!(DepositMade {
-        auction: ctx.accounts.auction_state.key(),
+        auction: auction_key,
         bidder: bidder_key,
         amount,
-        total_deposit,
+        total_deposit: deposit.amount,
     });
 
     Ok(())

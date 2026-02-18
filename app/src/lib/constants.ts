@@ -17,6 +17,7 @@ export const MAGIC_ROUTER_WS = "wss://devnet-router.magicblock.app/";
 // PDA Seeds
 export const AUCTION_SEED = Buffer.from("auction");
 export const VAULT_SEED = Buffer.from("vault");
+export const DEPOSIT_SEED = Buffer.from("deposit");
 // Protocol Constants
 export const PROTOCOL_FEE_BPS = 250; // 2.5%
 export const DEFAULT_EXTENSION_SECONDS = 300; // 5 min

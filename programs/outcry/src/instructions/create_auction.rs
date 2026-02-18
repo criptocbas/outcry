@@ -88,7 +88,6 @@ pub fn handle_create_auction(
     auction_state.min_bid_increment = min_bid_increment;
     auction_state.status = AuctionStatus::Created;
     auction_state.bid_count = 0;
-    auction_state.deposits = Vec::new();
     auction_state.bump = ctx.bumps.auction_state;
 
     let vault = &mut ctx.accounts.auction_vault;

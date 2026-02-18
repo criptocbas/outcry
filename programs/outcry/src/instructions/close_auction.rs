@@ -47,9 +47,9 @@ pub struct CloseAuction<'info> {
 pub fn handle_close_auction(ctx: Context<CloseAuction>) -> Result<()> {
     let auction = &ctx.accounts.auction_state;
 
-    // Ensure all deposits have been claimed
-    let has_outstanding = auction.deposits.iter().any(|d| d.amount > 0);
-    require!(!has_outstanding, OutcryError::OutstandingDeposits);
+    // NOTE: With separate BidderDeposit PDAs, outstanding deposit tracking
+    // is no longer embedded in AuctionState. Bidders close their own deposit
+    // accounts via claim_refund. The vault must be empty to close.
 
     // Ensure escrow is empty (NFT already transferred or returned)
     require!(

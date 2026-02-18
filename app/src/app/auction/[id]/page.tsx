@@ -7,6 +7,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import BN from "bn.js";
 import { useAuction, parseAuctionStatus } from "@/hooks/useAuction";
 import { useAuctionActions } from "@/hooks/useAuctionActions";
+import { useBidderDeposit } from "@/hooks/useBidderDeposit";
 import AuctionStatus from "@/components/auction/AuctionStatus";
 import CountdownTimer from "@/components/auction/CountdownTimer";
 import BidPanel from "@/components/auction/BidPanel";
@@ -138,13 +139,12 @@ export default function AuctionRoomPage({
   const isSettled = statusLabel === "Settled";
   const isCancelled = statusLabel === "Cancelled";
 
-  // Derive user deposit from the deposits array
-  const userDeposit =
-    auction && publicKey
-      ? auction.deposits?.find(
-          (d) => d.bidder.toBase58() === publicKey.toBase58()
-        )?.amount?.toNumber() ?? null
-      : null;
+  // Fetch user's BidderDeposit PDA (lives on L1, works even when auction is delegated)
+  const { deposit: bidderDepositAccount, refetch: refetchDeposit } = useBidderDeposit(
+    id,
+    publicKey?.toBase58() ?? null
+  );
+  const userDeposit = bidderDepositAccount?.amount?.toNumber() ?? null;
 
   // Action handlers
   const handleDeposit = useCallback(
@@ -154,7 +154,7 @@ export default function AuctionRoomPage({
       try {
         await actions.deposit(new PublicKey(id), new BN(lamports));
         addToast("Deposit successful", "success");
-        await refetch();
+        await Promise.all([refetch(), refetchDeposit()]);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Deposit failed";
         addToast(msg, "error");
@@ -162,7 +162,7 @@ export default function AuctionRoomPage({
         setActionLoading(false);
       }
     },
-    [auction, actions, id, addToast, refetch]
+    [auction, actions, id, addToast, refetch, refetchDeposit]
   );
 
   const handleBid = useCallback(
@@ -295,16 +295,18 @@ export default function AuctionRoomPage({
   // Hue for artwork placeholder
   const hue = seedHue(id);
 
-  // Build bid history from deposits (proxy -- real bid history would come from
-  // transaction logs, but for now we show deposits as activity).
+  // Bid history — currently shows current bid as latest entry.
+  // Real bid history would come from transaction logs / events.
   const bidHistory =
-    auction?.deposits
-      ?.filter((d) => d.amount.toNumber() > 0)
-      .map((d) => ({
-        bidder: d.bidder.toBase58(),
-        amount: d.amount.toNumber(),
-        timestamp: Math.floor(Date.now() / 1000), // placeholder
-      })) ?? [];
+    auction && auction.currentBid.toNumber() > 0
+      ? [
+          {
+            bidder: auction.highestBidder.toBase58(),
+            amount: auction.currentBid.toNumber(),
+            timestamp: Math.floor(Date.now() / 1000),
+          },
+        ]
+      : [];
 
   // ---------------------------------------------------------------------------
   // Loading state
@@ -515,8 +517,8 @@ export default function AuctionRoomPage({
                 )}
             </div>
 
-            {/* Bid Panel (only during active auction) */}
-            {isActive && (
+            {/* Bid Panel (during Created or Active) */}
+            {(isActive || isCreated) && (
               <BidPanel
                 auctionState={{
                   currentBid: auction.currentBid.toNumber(),
@@ -528,33 +530,16 @@ export default function AuctionRoomPage({
                 onDeposit={handleDeposit}
                 userDeposit={userDeposit}
                 isLoading={actionLoading}
-                depositDisabled={isDelegated === true}
+                isSeller={isSeller}
               />
             )}
 
             {/* Action buttons based on status */}
             <div className="flex flex-col gap-3">
-              {/* Created + seller: Start Auction + Delegate */}
+              {/* Created + seller: Start Auction (L1 only — don't auto-delegate) */}
               {isCreated && isSeller && (
                 <button
-                  onClick={async () => {
-                    setActionLoading(true);
-                    try {
-                      // Start auction then delegate in sequence
-                      await actions.startAuction(new PublicKey(id), auction.nftMint);
-                      addToast("Auction started! Delegating to ER...", "success");
-                      // Small delay for L1 confirmation
-                      await new Promise((r) => setTimeout(r, 2000));
-                      await actions.delegateAuction(new PublicKey(id), auction.nftMint);
-                      addToast("Delegated to Ephemeral Rollup — live bidding enabled!", "success");
-                      await refetch();
-                    } catch (err: unknown) {
-                      const msg = err instanceof Error ? err.message : "Failed to start";
-                      addToast(msg, "error");
-                    } finally {
-                      setActionLoading(false);
-                    }
-                  }}
+                  onClick={handleStartAuction}
                   disabled={actionLoading}
                   className="flex h-12 w-full items-center justify-center rounded-md bg-gold text-sm font-semibold tracking-[0.15em] text-jet uppercase transition-all duration-200 hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -562,31 +547,22 @@ export default function AuctionRoomPage({
                 </button>
               )}
 
-              {/* Created + not seller: Deposit to prepare */}
-              {isCreated && !isSeller && (
-                <BidPanel
-                  auctionState={{
-                    currentBid: auction.currentBid.toNumber(),
-                    highestBidder: auction.highestBidder?.toBase58() ?? null,
-                    status: auction.status,
-                    reservePrice: auction.reservePrice.toNumber(),
-                  }}
-                  onBid={handleBid}
-                  onDeposit={handleDeposit}
-                  userDeposit={userDeposit}
-                  isLoading={actionLoading}
-                />
-              )}
+              {/* Created + not seller: BidPanel already shown above */}
 
-              {/* Active + seller + not delegated: Manual delegate fallback */}
+              {/* Active + seller + not delegated: Go live on ER */}
               {isActive && isSeller && isDelegated === false && (
-                <button
-                  onClick={handleDelegateAuction}
-                  disabled={actionLoading}
-                  className="flex h-12 w-full items-center justify-center rounded-md border border-gold/40 text-sm font-medium tracking-[0.15em] text-gold uppercase transition-all duration-200 hover:border-gold hover:bg-gold/5 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {actionLoading ? <Spinner /> : "Delegate to ER"}
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={handleDelegateAuction}
+                    disabled={actionLoading}
+                    className="flex h-12 w-full items-center justify-center rounded-md bg-emerald-600 text-sm font-semibold tracking-[0.15em] text-white uppercase transition-all duration-200 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {actionLoading ? <Spinner /> : "Go Live on ER"}
+                  </button>
+                  <p className="text-center text-[10px] text-cream/25">
+                    Delegates to Ephemeral Rollup for sub-50ms bidding. Deposits still work after this.
+                  </p>
+                </div>
               )}
 
               {/* Ended: Undelegate + Settle */}

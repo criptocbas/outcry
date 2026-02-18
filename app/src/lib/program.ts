@@ -2,7 +2,7 @@ import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import type { Idl } from "@coral-xyz/anchor";
 import { Connection, PublicKey } from "@solana/web3.js";
 import type { AnchorWallet } from "@solana/wallet-adapter-react";
-import { PROGRAM_ID, AUCTION_SEED, VAULT_SEED } from "./constants";
+import { PROGRAM_ID, AUCTION_SEED, VAULT_SEED, DEPOSIT_SEED } from "./constants";
 import idl from "./idl.json";
 
 /**
@@ -46,6 +46,20 @@ export function getVaultPDA(
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [VAULT_SEED, auctionState.toBuffer()],
+    PROGRAM_ID
+  );
+}
+
+/**
+ * Derives the BidderDeposit PDA.
+ * Seeds: ["deposit", auction_state_pubkey, bidder_pubkey]
+ */
+export function getDepositPDA(
+  auctionState: PublicKey,
+  bidder: PublicKey
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [DEPOSIT_SEED, auctionState.toBuffer(), bidder.toBuffer()],
     PROGRAM_ID
   );
 }

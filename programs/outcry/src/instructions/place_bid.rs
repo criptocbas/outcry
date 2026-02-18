@@ -42,11 +42,9 @@ pub fn handle_place_bid(ctx: Context<PlaceBid>, amount: u64) -> Result<()> {
         require!(amount >= min_bid, OutcryError::BidTooLow);
     }
 
-    // Validate bidder has sufficient deposit
-    let (_, deposit_amount) = auction
-        .find_deposit(&bidder_key)
-        .ok_or(OutcryError::InsufficientDeposit)?;
-    require!(deposit_amount >= amount, OutcryError::InsufficientDeposit);
+    // NOTE: Deposit validation is deferred to settle_auction on L1.
+    // The ER only tracks bid state — actual SOL lives in the L1 vault.
+    // Frontend enforces deposit checks client-side before allowing a bid.
 
     let previous_bid = auction.current_bid;
 

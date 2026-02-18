@@ -1,14 +1,5 @@
 use anchor_lang::prelude::*;
 
-use crate::constants::MAX_BIDDERS;
-
-/// Deposit entry embedded in AuctionState — travels with account to ER
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
-pub struct DepositEntry {
-    pub bidder: Pubkey,
-    pub amount: u64,
-}
-
 #[account]
 pub struct AuctionState {
     /// The seller / artist who created this auction
@@ -37,15 +28,12 @@ pub struct AuctionState {
     pub status: AuctionStatus,
     /// Total number of bids placed
     pub bid_count: u32,
-    /// Bidder deposits — embedded so they travel with delegation to ER
-    pub deposits: Vec<DepositEntry>,
     /// PDA bump seed
     pub bump: u8,
 }
 
 impl AuctionState {
-    /// Fixed space: 8 (discriminator) + fixed fields + vec overhead + bump
-    /// Vec<DepositEntry>: 4 (len prefix) + MAX_BIDDERS * (32 + 8)
+    /// Fixed space: 8 (discriminator) + all fixed-size fields
     pub const SPACE: usize = 8   // discriminator
         + 32   // seller
         + 32   // nft_mint
@@ -60,16 +48,7 @@ impl AuctionState {
         + 8    // min_bid_increment
         + 1    // status
         + 4    // bid_count
-        + 4 + (MAX_BIDDERS * (32 + 8))  // deposits vec
         + 1;   // bump
-
-    /// Find a bidder's deposit entry, return index and amount
-    pub fn find_deposit(&self, bidder: &Pubkey) -> Option<(usize, u64)> {
-        self.deposits
-            .iter()
-            .position(|d| d.bidder == *bidder)
-            .map(|i| (i, self.deposits[i].amount))
-    }
 }
 
 #[account]
@@ -77,6 +56,21 @@ impl AuctionState {
 pub struct AuctionVault {
     /// The parent auction this vault belongs to
     pub auction: Pubkey,
+    /// PDA bump seed
+    pub bump: u8,
+}
+
+/// Per-bidder deposit tracking — lives on L1, never delegated.
+/// Seeds: [b"deposit", auction_state.key(), bidder.key()]
+#[account]
+#[derive(InitSpace)]
+pub struct BidderDeposit {
+    /// The auction this deposit is for
+    pub auction: Pubkey,
+    /// The bidder who deposited
+    pub bidder: Pubkey,
+    /// Total deposited amount (lamports)
+    pub amount: u64,
     /// PDA bump seed
     pub bump: u8,
 }

@@ -7,3 +7,4 @@ pub const MAX_BIDDERS: usize = 20; // Max depositors per auction (keeps account 
 
 pub const AUCTION_SEED: &[u8] = b"auction";
 pub const VAULT_SEED: &[u8] = b"vault";
+pub const DEPOSIT_SEED: &[u8] = b"deposit";

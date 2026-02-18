@@ -4,7 +4,7 @@ use crate::{
     constants::*,
     errors::OutcryError,
     events::RefundClaimed,
-    state::{AuctionState, AuctionStatus, AuctionVault},
+    state::{AuctionState, AuctionStatus, AuctionVault, BidderDeposit},
 };
 
 #[derive(Accounts)]
@@ -13,12 +13,19 @@ pub struct ClaimRefund<'info> {
     pub bidder: Signer<'info>,
 
     #[account(
-        mut,
         constraint = auction_state.status == AuctionStatus::Settled
             || auction_state.status == AuctionStatus::Cancelled
             @ OutcryError::RefundNotAvailable,
     )]
     pub auction_state: Account<'info, AuctionState>,
+
+    #[account(
+        mut,
+        seeds = [DEPOSIT_SEED, auction_state.key().as_ref(), bidder.key().as_ref()],
+        bump = bidder_deposit.bump,
+        constraint = bidder_deposit.amount > 0 @ OutcryError::NothingToRefund,
+    )]
+    pub bidder_deposit: Account<'info, BidderDeposit>,
 
     #[account(
         mut,
@@ -31,16 +38,13 @@ pub struct ClaimRefund<'info> {
 }
 
 pub fn handle_claim_refund(ctx: Context<ClaimRefund>) -> Result<()> {
-    let auction = &mut ctx.accounts.auction_state;
+    let deposit = &mut ctx.accounts.bidder_deposit;
+    let refund_amount = deposit.amount;
     let bidder_key = ctx.accounts.bidder.key();
-
-    let (idx, refund_amount) = auction
-        .find_deposit(&bidder_key)
-        .ok_or(OutcryError::NothingToRefund)?;
-    require!(refund_amount > 0, OutcryError::NothingToRefund);
+    let auction_key = ctx.accounts.auction_state.key();
 
     // Zero out the deposit
-    auction.deposits[idx].amount = 0;
+    deposit.amount = 0;
 
     // Transfer SOL from vault to bidder
     let vault_info = ctx.accounts.auction_vault.to_account_info();
@@ -50,7 +54,7 @@ pub fn handle_claim_refund(ctx: Context<ClaimRefund>) -> Result<()> {
     **bidder_info.try_borrow_mut_lamports()? += refund_amount;
 
     emit!(RefundClaimed {
-        auction: ctx.accounts.auction_state.key(),
+        auction: auction_key,
         bidder: bidder_key,
         amount: refund_amount,
     });

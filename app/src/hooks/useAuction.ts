@@ -13,11 +13,6 @@ import { getMagicConnection } from "@/lib/magic-router";
 // Types
 // ---------------------------------------------------------------------------
 
-export interface DepositEntry {
-  bidder: PublicKey;
-  amount: BN;
-}
-
 export interface AuctionAccount {
   seller: PublicKey;
   nftMint: PublicKey;
@@ -32,7 +27,6 @@ export interface AuctionAccount {
   minBidIncrement: BN;
   status: AuctionStatusRaw;
   bidCount: number;
-  deposits: DepositEntry[];
   bump: number;
 }
 

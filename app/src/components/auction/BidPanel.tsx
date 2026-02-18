@@ -17,8 +17,7 @@ interface BidPanelProps {
   onDeposit: (amount: number) => void;
   userDeposit: number | null;
   isLoading: boolean;
-  /** When true, deposits are blocked (e.g. auction is delegated to ER) */
-  depositDisabled?: boolean;
+  isSeller?: boolean;
 }
 
 function formatSol(lamports: number): string {
@@ -37,7 +36,7 @@ export default function BidPanel({
   onDeposit,
   userDeposit,
   isLoading,
-  depositDisabled = false,
+  isSeller = false,
 }: BidPanelProps) {
   const minBid = useMemo(() => {
     if (auctionState.currentBid > 0) {
@@ -52,7 +51,9 @@ export default function BidPanel({
   const [bidInput, setBidInput] = useState<string>(
     formatSol(minBid)
   );
-  const [depositInput, setDepositInput] = useState<string>("");
+  const [depositInput, setDepositInput] = useState<string>(
+    formatSol(minBid)
+  );
 
   const handleBid = () => {
     const lamports = parseSolToLamports(bidInput);
@@ -101,25 +102,16 @@ export default function BidPanel({
 
       <div className="h-px bg-[#2A2A2A]" />
 
-      {/* Deposit or Bid section */}
-      {needsDeposit ? (
+      {/* Seller sees a message instead of bid controls */}
+      {isSeller ? (
+        <p
+          className="text-center text-xs text-[#F5F0E8]/40"
+          style={{ fontFamily: "'DM Sans', sans-serif" }}
+        >
+          You are the seller — you cannot bid on your own auction.
+        </p>
+      ) : needsDeposit ? (
         /* Deposit flow */
-        depositDisabled ? (
-          <div className="flex flex-col gap-2 text-center">
-            <p
-              className="text-xs text-[#F5F0E8]/40"
-              style={{ fontFamily: "'DM Sans', sans-serif" }}
-            >
-              Deposits must be made before the auction starts.
-            </p>
-            <p
-              className="text-[11px] text-[#F5F0E8]/25"
-              style={{ fontFamily: "'DM Sans', sans-serif" }}
-            >
-              This auction is live on the Ephemeral Rollup — only pre-deposited bidders can place bids.
-            </p>
-          </div>
-        ) : (
         <div className="flex flex-col gap-3">
           <p
             className="text-center text-xs text-[#F5F0E8]/40"
@@ -161,7 +153,6 @@ export default function BidPanel({
             {isLoading ? <Spinner /> : "Deposit SOL"}
           </button>
         </div>
-        )
       ) : (
         /* Bid flow */
         <div className="flex flex-col gap-3">

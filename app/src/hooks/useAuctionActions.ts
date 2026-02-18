@@ -12,7 +12,7 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import BN from "bn.js";
-import { getProgram, getAuctionPDA, getVaultPDA } from "@/lib/program";
+import { getProgram, getAuctionPDA, getVaultPDA, getDepositPDA } from "@/lib/program";
 import { getMagicConnection } from "@/lib/magic-router";
 import { PROGRAM_ID, DELEGATION_PROGRAM_ID, DEVNET_RPC } from "@/lib/constants";
 
@@ -100,6 +100,77 @@ function getDelegationMetadataPDA(
 // Magic Program addresses (auto-added by #[commit] macro)
 const MAGIC_PROGRAM_ID = new PublicKey("Magic11111111111111111111111111111111111111");
 const MAGIC_CONTEXT_ID = new PublicKey("MagicContext1111111111111111111111111111111");
+
+/**
+ * Get the correct blockhash for a Magic Router transaction.
+ *
+ * The ER has its own blockhash progression separate from L1. The Magic Router
+ * exposes a custom `getBlockhashForAccounts` RPC that inspects which accounts
+ * are delegated and returns the appropriate blockhash.
+ */
+async function getMagicBlockhash(
+  rpcEndpoint: string,
+  tx: import("@solana/web3.js").Transaction
+): Promise<{ blockhash: string; lastValidBlockHeight: number }> {
+  const writableAccounts = new Set<string>();
+  if (tx.feePayer) writableAccounts.add(tx.feePayer.toBase58());
+  for (const ix of tx.instructions) {
+    for (const key of ix.keys) {
+      if (key.isWritable) writableAccounts.add(key.pubkey.toBase58());
+    }
+  }
+
+  const res = await fetch(rpcEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "getBlockhashForAccounts",
+      params: [Array.from(writableAccounts)],
+    }),
+  });
+  const data = await res.json();
+  return data.result;
+}
+
+/**
+ * Send a transaction through the Magic Router with the correct blockhash.
+ *
+ * Anchor's `.rpc()` uses `getLatestBlockhash()` which returns L1 blockhash,
+ * but the ER has its own blockhash progression. Using `.rpc()` causes
+ * "Blockhash not found" because the wallet signs with an L1 blockhash but the
+ * tx is routed to the ER (or vice versa).
+ *
+ * This helper:
+ * 1. Builds the unsigned transaction via Anchor's `.transaction()`
+ * 2. Calls `getBlockhashForAccounts` on the Magic Router to get the correct
+ *    blockhash (ER or L1 depending on delegation status)
+ * 3. Signs with the wallet adapter
+ * 4. Sends as raw bytes — bypassing the problematic sendTransaction override
+ */
+async function sendErTransaction(
+  txBuilder: { transaction: () => Promise<import("@solana/web3.js").Transaction> },
+  walletAdapter: { signTransaction: (tx: import("@solana/web3.js").Transaction) => Promise<import("@solana/web3.js").Transaction> },
+  feePayer: PublicKey,
+  connection: Connection
+): Promise<string> {
+  const tx = await txBuilder.transaction();
+  tx.feePayer = feePayer;
+
+  const { blockhash, lastValidBlockHeight } = await getMagicBlockhash(
+    connection.rpcEndpoint,
+    tx
+  );
+  tx.recentBlockhash = blockhash;
+  tx.lastValidBlockHeight = lastValidBlockHeight;
+
+  const signed = await walletAdapter.signTransaction(tx);
+  const sig = await connection.sendRawTransaction(signed.serialize(), {
+    skipPreflight: true,
+  });
+  return sig;
+}
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -198,12 +269,14 @@ export function useAuctionActions(): UseAuctionActionsReturn {
       }
 
       const [auctionVault] = getVaultPDA(auctionStatePubkey);
+      const [bidderDeposit] = getDepositPDA(auctionStatePubkey, publicKey);
 
       const sig = await l1Program.methods
         .deposit(amount)
         .accounts({
           bidder: publicKey,
           auctionState: auctionStatePubkey,
+          bidderDeposit,
           auctionVault,
           systemProgram: SystemProgram.programId,
         })
@@ -273,21 +346,23 @@ export function useAuctionActions(): UseAuctionActionsReturn {
   // -----------------------------------------------------------------------
   const placeBid = useCallback(
     async (auctionStatePubkey: PublicKey, amount: BN): Promise<string> => {
-      if (!erProgram || !publicKey) {
+      if (!erProgram || !publicKey || !wallet) {
         throw new Error("Wallet not connected");
       }
 
-      const sig = await erProgram.methods
-        .placeBid(amount)
-        .accounts({
-          bidder: publicKey,
-          auctionState: auctionStatePubkey,
-        })
-        .rpc({ skipPreflight: true });
-
-      return sig;
+      return sendErTransaction(
+        erProgram.methods
+          .placeBid(amount)
+          .accounts({
+            bidder: publicKey,
+            auctionState: auctionStatePubkey,
+          }),
+        wallet,
+        publicKey,
+        magicConnection
+      );
     },
-    [erProgram, publicKey]
+    [erProgram, publicKey, wallet, magicConnection]
   );
 
   // -----------------------------------------------------------------------
@@ -295,21 +370,23 @@ export function useAuctionActions(): UseAuctionActionsReturn {
   // -----------------------------------------------------------------------
   const endAuction = useCallback(
     async (auctionStatePubkey: PublicKey): Promise<string> => {
-      if (!erProgram || !publicKey) {
+      if (!erProgram || !publicKey || !wallet) {
         throw new Error("Wallet not connected");
       }
 
-      const sig = await erProgram.methods
-        .endAuction()
-        .accounts({
-          authority: publicKey,
-          auctionState: auctionStatePubkey,
-        })
-        .rpc({ skipPreflight: true });
-
-      return sig;
+      return sendErTransaction(
+        erProgram.methods
+          .endAuction()
+          .accounts({
+            authority: publicKey,
+            auctionState: auctionStatePubkey,
+          }),
+        wallet,
+        publicKey,
+        magicConnection
+      );
     },
-    [erProgram, publicKey]
+    [erProgram, publicKey, wallet, magicConnection]
   );
 
   // -----------------------------------------------------------------------
@@ -317,23 +394,25 @@ export function useAuctionActions(): UseAuctionActionsReturn {
   // -----------------------------------------------------------------------
   const undelegateAuction = useCallback(
     async (auctionStatePubkey: PublicKey): Promise<string> => {
-      if (!erProgram || !publicKey) {
+      if (!erProgram || !publicKey || !wallet) {
         throw new Error("Wallet not connected");
       }
 
-      const sig = await erProgram.methods
-        .undelegateAuction()
-        .accounts({
-          payer: publicKey,
-          auctionState: auctionStatePubkey,
-          magicProgram: MAGIC_PROGRAM_ID,
-          magicContext: MAGIC_CONTEXT_ID,
-        })
-        .rpc({ skipPreflight: true });
-
-      return sig;
+      return sendErTransaction(
+        erProgram.methods
+          .undelegateAuction()
+          .accounts({
+            payer: publicKey,
+            auctionState: auctionStatePubkey,
+            magicProgram: MAGIC_PROGRAM_ID,
+            magicContext: MAGIC_CONTEXT_ID,
+          }),
+        wallet,
+        publicKey,
+        magicConnection
+      );
     },
-    [erProgram, publicKey]
+    [erProgram, publicKey, wallet, magicConnection]
   );
 
   // -----------------------------------------------------------------------
@@ -351,6 +430,7 @@ export function useAuctionActions(): UseAuctionActionsReturn {
       }
 
       const [auctionVault] = getVaultPDA(auctionStatePubkey);
+      const [winnerDeposit] = getDepositPDA(auctionStatePubkey, winner);
 
       const escrowNftTokenAccount = await getAssociatedTokenAddress(
         nftMint,
@@ -369,6 +449,7 @@ export function useAuctionActions(): UseAuctionActionsReturn {
           payer: publicKey,
           auctionState: auctionStatePubkey,
           auctionVault,
+          winnerDeposit,
           seller,
           winner,
           nftMint,
@@ -395,12 +476,14 @@ export function useAuctionActions(): UseAuctionActionsReturn {
       }
 
       const [auctionVault] = getVaultPDA(auctionStatePubkey);
+      const [bidderDeposit] = getDepositPDA(auctionStatePubkey, publicKey);
 
       const sig = await l1Program.methods
         .claimRefund()
         .accounts({
           bidder: publicKey,
           auctionState: auctionStatePubkey,
+          bidderDeposit,
           auctionVault,
           systemProgram: SystemProgram.programId,
         })
