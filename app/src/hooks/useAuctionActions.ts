@@ -545,14 +545,36 @@ export function useAuctionActions(): UseAuctionActionsReturn {
         throw new Error(`Send failed: ${txMsg}`);
       }
 
-      // Wait for confirmation
+      // Wait for confirmation and check for on-chain errors
       try {
-        await l1Connection.confirmTransaction(
+        const confirmation = await l1Connection.confirmTransaction(
           { signature: sig, blockhash, lastValidBlockHeight },
           "confirmed"
         );
-        console.log("[settle] confirmed:", sig);
+        console.log("[settle] confirmation result:", JSON.stringify(confirmation));
+
+        // confirmTransaction resolves even for failed txs — must check .value.err
+        if (confirmation.value.err) {
+          // Fetch transaction logs for detailed error info
+          const txDetails = await l1Connection.getTransaction(sig, {
+            commitment: "confirmed",
+            maxSupportedTransactionVersion: 0,
+          });
+          const logs = txDetails?.meta?.logMessages ?? [];
+          console.error("[settle] on-chain error:", confirmation.value.err);
+          console.error("[settle] program logs:", logs);
+
+          // Extract meaningful error from logs
+          const errorLog = logs.find(l => l.includes("Error") || l.includes("failed"));
+          throw new Error(`Transaction failed: ${errorLog || JSON.stringify(confirmation.value.err)}`);
+        }
+
+        console.log("[settle] confirmed successfully:", sig);
       } catch (confirmErr: unknown) {
+        // Re-throw if it's our own error from above
+        if (confirmErr instanceof Error && confirmErr.message.startsWith("Transaction failed:")) {
+          throw confirmErr;
+        }
         console.error("[settle] confirmation failed:", confirmErr);
         // Check if tx actually succeeded despite confirmation timeout
         const status = await l1Connection.getSignatureStatus(sig);

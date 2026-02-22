@@ -160,7 +160,7 @@ export default function AuctionRoomPage({
   const timerExpired =
     auction && auction.endTime.toNumber() > 0 &&
     Math.floor(Date.now() / 1000) >= auction.endTime.toNumber();
-  const canSettle = isEnded || (isActive && timerExpired);
+  const canSettle = !isSettled && !isCancelled && (isEnded || (isActive && timerExpired));
 
   // Fetch user's BidderDeposit PDA (lives on L1, works even when auction is delegated)
   const { deposit: bidderDepositAccount, refetch: refetchDeposit } = useBidderDeposit(
@@ -751,8 +751,8 @@ export default function AuctionRoomPage({
                 </button>
               )}
 
-              {/* Settled or Cancelled: Claim Refund */}
-              {(isSettled || isCancelled) && userDeposit && userDeposit > 0 && (
+              {/* Settled or Cancelled or Ended: Claim Refund */}
+              {(isSettled || isCancelled || isEnded) && userDeposit && userDeposit > 0 && (
                 <button
                   onClick={handleClaimRefund}
                   disabled={actionLoading}
