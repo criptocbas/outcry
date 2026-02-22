@@ -13,6 +13,7 @@ import {
   getFollowers,
   getFollowing,
   findOrCreateProfile,
+  updateUsername,
 } from "@/lib/tapestry";
 import type { ProfileWithCounts } from "@/lib/tapestry";
 
@@ -52,6 +53,10 @@ export default function ProfilePage({
   const [registering, setRegistering] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
   const [registerError, setRegisterError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editInput, setEditInput] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const { badges, loading: badgesLoading } = useBadges(address);
 
   // Fetch profile
@@ -112,6 +117,37 @@ export default function ProfilePage({
     }
   };
 
+  // Edit username
+  const handleEditUsername = async () => {
+    if (!profile) return;
+    const trimmed = editInput.trim();
+    if (trimmed === profile.profile.username) {
+      setEditing(false);
+      return;
+    }
+    if (trimmed.length < 3) {
+      setEditError("Username must be at least 3 characters.");
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      setEditError("Letters, numbers, and underscores only.");
+      return;
+    }
+    setEditError(null);
+    setSaving(true);
+    try {
+      const p = await updateUsername(profile.profile.id, trimmed);
+      setProfile(p);
+      setEditing(false);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to update username";
+      setEditError(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Loading
   if (loading) {
     return (
@@ -142,6 +178,64 @@ export default function ProfilePage({
         className="flex flex-col items-center gap-6 border-b border-charcoal-light pb-8"
       >
         <ProfileBadge walletAddress={address} size="lg" />
+
+        {/* Username */}
+        {profile && !editing && (
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-cream">
+              {profile.profile.username}
+            </h1>
+            {isOwnProfile && (
+              <button
+                onClick={() => {
+                  setEditInput(profile.profile.username);
+                  setEditError(null);
+                  setEditing(true);
+                }}
+                className="text-xs text-cream/30 transition-colors hover:text-gold"
+              >
+                edit
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Edit username inline */}
+        {editing && (
+          <div className="flex w-full max-w-xs flex-col items-center gap-2">
+            <input
+              type="text"
+              value={editInput}
+              onChange={(e) => setEditInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleEditUsername();
+                if (e.key === "Escape") setEditing(false);
+              }}
+              maxLength={30}
+              autoFocus
+              className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-2 text-center text-sm text-cream placeholder-cream/20 outline-none transition-colors focus:border-gold/60"
+            />
+            {editError && (
+              <p className="text-xs text-red-400">{editError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handleEditUsername}
+                disabled={saving || !editInput.trim()}
+                className="rounded-md bg-gold px-4 py-1.5 text-xs font-semibold tracking-[0.1em] text-jet uppercase transition-all hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className="rounded-md border border-charcoal-light px-4 py-1.5 text-xs text-cream/50 transition-colors hover:text-cream disabled:opacity-40"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Wallet address */}
         <p className="font-mono text-xs text-cream/40">

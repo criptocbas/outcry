@@ -148,6 +148,31 @@ export async function findOrCreateProfile(
   return { profile, socialCounts };
 }
 
+export async function updateUsername(
+  profileId: string,
+  username: string
+): Promise<ProfileWithCounts> {
+  const raw = await fetchJson<Record<string, unknown>>(
+    `${API_BASE}/profile/${encodeURIComponent(profileId)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username }),
+    }
+  );
+
+  const profile = (raw.profile ?? raw) as ProfileWithCounts["profile"];
+  const partial = (raw.socialCounts ?? {}) as Partial<SocialCounts>;
+  const socialCounts: SocialCounts = {
+    followers: partial.followers ?? 0,
+    following: partial.following ?? 0,
+    posts: partial.posts ?? 0,
+    likes: partial.likes ?? 0,
+  };
+
+  return { profile, socialCounts };
+}
+
 // -- Follows ----------------------------------------------------------------
 
 export async function checkFollowStatus(
