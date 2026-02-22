@@ -50,6 +50,8 @@ export default function ProfilePage({
     "followers"
   );
   const [registering, setRegistering] = useState(false);
+  const [usernameInput, setUsernameInput] = useState("");
+  const [registerError, setRegisterError] = useState<string | null>(null);
   const { badges, loading: badgesLoading } = useBadges(address);
 
   // Fetch profile
@@ -88,13 +90,23 @@ export default function ProfilePage({
   // Register profile
   const handleRegister = async () => {
     if (!publicKey) return;
+    const trimmed = usernameInput.trim();
+    if (trimmed.length < 3) {
+      setRegisterError("Username must be at least 3 characters.");
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      setRegisterError("Letters, numbers, and underscores only.");
+      return;
+    }
+    setRegisterError(null);
     setRegistering(true);
     try {
-      const username = `outcry_${address.slice(0, 8)}`;
-      const p = await findOrCreateProfile(address, username);
+      const p = await findOrCreateProfile(address, trimmed);
       setProfile(p);
-    } catch {
-      // Silently ignore
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create profile";
+      setRegisterError(msg);
     } finally {
       setRegistering(false);
     }
@@ -158,13 +170,27 @@ export default function ProfilePage({
         )}
 
         {!profile && isOwnProfile && (
-          <button
-            onClick={handleRegister}
-            disabled={registering}
-            className="flex h-10 items-center justify-center rounded-md bg-gold px-6 text-sm font-semibold tracking-[0.1em] text-jet uppercase transition-all duration-200 hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {registering ? "Creating..." : "Create Profile"}
-          </button>
+          <div className="flex w-full max-w-xs flex-col items-center gap-3">
+            <input
+              type="text"
+              value={usernameInput}
+              onChange={(e) => setUsernameInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleRegister()}
+              placeholder="Choose a username"
+              maxLength={30}
+              className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-2.5 text-center text-sm text-cream placeholder-cream/20 outline-none transition-colors focus:border-gold/60"
+            />
+            {registerError && (
+              <p className="text-xs text-red-400">{registerError}</p>
+            )}
+            <button
+              onClick={handleRegister}
+              disabled={registering || !usernameInput.trim()}
+              className="flex h-10 w-full items-center justify-center rounded-md bg-gold text-sm font-semibold tracking-[0.1em] text-jet uppercase transition-all duration-200 hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {registering ? "Creating..." : "Create Profile"}
+            </button>
+          </div>
         )}
 
         {!profile && !isOwnProfile && (
