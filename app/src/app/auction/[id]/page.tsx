@@ -255,12 +255,16 @@ export default function AuctionRoomPage({
         try {
           await actions.endAuction(new PublicKey(id));
           addToast("Auction ended", "success");
-          await new Promise((r) => setTimeout(r, 2000));
         } catch (endErr: unknown) {
           const endMsg = endErr instanceof Error ? endErr.message : "";
           // Ignore if already ended
-          if (!endMsg.includes("InvalidAuctionStatus")) throw endErr;
+          if (!endMsg.includes("InvalidAuctionStatus")) {
+            throw new Error(`End auction failed: ${endMsg || "Unknown error"}`);
+          }
         }
+        // Wait for ER to process the end
+        setProgressLabel("Waiting for confirmation...");
+        await new Promise((r) => setTimeout(r, 3000));
       }
 
       // Step 2: Undelegate from ER (if delegated)
@@ -269,12 +273,44 @@ export default function AuctionRoomPage({
         try {
           await actions.undelegateAuction(new PublicKey(id));
           addToast("Undelegated from ER", "success");
-          await new Promise((r) => setTimeout(r, 3000));
-        } catch {
-          // May not be delegated — continue to settle
+        } catch (undelegateErr: unknown) {
+          const undelegateMsg = undelegateErr instanceof Error ? undelegateErr.message : "";
+          // Only ignore if truly not delegated
+          if (undelegateMsg.includes("not delegated") || undelegateMsg.includes("AccountNotDelegated")) {
+            // Not delegated — safe to continue
+          } else {
+            throw new Error(`Undelegate failed: ${undelegateMsg || "Unknown error"}`);
+          }
         }
+
+        // Poll L1 to verify state is back (up to 30 seconds)
+        setProgressLabel("Waiting for L1 confirmation...");
+        const auctionPubkey = new PublicKey(id);
+        const [delegationRecord] = PublicKey.findProgramAddressSync(
+          [Buffer.from("delegation"), auctionPubkey.toBuffer()],
+          DELEGATION_PROGRAM_ID
+        );
+        let stateOnL1 = false;
+        for (let attempt = 0; attempt < 15; attempt++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          try {
+            const info = await l1Connection.getAccountInfo(delegationRecord);
+            if (info === null) {
+              // Delegation record gone — state is back on L1
+              stateOnL1 = true;
+              break;
+            }
+          } catch {
+            // RPC error — keep trying
+          }
+        }
+        if (!stateOnL1) {
+          throw new Error("Timed out waiting for state to return to L1. Try again in a few seconds.");
+        }
+        addToast("State confirmed on L1", "success");
       }
 
+      // Step 3: Settle
       setProgressLabel("Settling auction...");
       try {
         await actions.settleAuction(
@@ -285,8 +321,8 @@ export default function AuctionRoomPage({
         );
         addToast("Auction settled!", "success");
       } catch (settleErr: unknown) {
-        // If settlement failed (likely insufficient deposit), try forfeit
         const settleMsg = settleErr instanceof Error ? settleErr.message : "";
+        // If settlement failed (likely insufficient deposit), try forfeit
         if (settleMsg.includes("InsufficientDeposit") || settleMsg.includes("0x1776")) {
           setProgressLabel("Winner defaulted — forfeiting auction...");
           await actions.forfeitAuction(
@@ -297,7 +333,7 @@ export default function AuctionRoomPage({
           );
           addToast("Auction forfeited — NFT returned to seller, winner deposit slashed", "success");
         } else {
-          throw settleErr;
+          throw new Error(`Settle failed: ${settleMsg || "Unknown error"}`);
         }
       }
       await refetch();
@@ -324,12 +360,13 @@ export default function AuctionRoomPage({
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Settlement failed";
+      console.error("Settlement error:", err);
       addToast(msg, "error");
     } finally {
       setActionLoading(false);
       setProgressLabel(null);
     }
-  }, [auction, actions, id, addToast, refetch, publicKey, isDelegated, isActive, timerExpired]);
+  }, [auction, actions, id, addToast, refetch, publicKey, isDelegated, isActive, timerExpired, l1Connection]);
 
   // -------------------------------------------------------------------------
   // Claim refund
