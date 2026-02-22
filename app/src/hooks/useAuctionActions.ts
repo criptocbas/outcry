@@ -433,7 +433,7 @@ export function useAuctionActions(): UseAuctionActionsReturn {
       seller: PublicKey,
       winner: PublicKey
     ): Promise<string> => {
-      if (!l1Program || !publicKey) {
+      if (!l1Program || !publicKey || !wallet) {
         throw new Error("Wallet not connected");
       }
 
@@ -471,7 +471,23 @@ export function useAuctionActions(): UseAuctionActionsReturn {
         }
       }
 
-      const sig = await l1Program.methods
+      console.log("[settle] accounts:", {
+        payer: publicKey.toBase58(),
+        auctionState: auctionStatePubkey.toBase58(),
+        auctionVault: auctionVault.toBase58(),
+        winnerDeposit: winnerDeposit.toBase58(),
+        seller: seller.toBase58(),
+        winner: winner.toBase58(),
+        nftMint: nftMint.toBase58(),
+        nftMetadata: nftMetadata.toBase58(),
+        escrowNftTokenAccount: escrowNftTokenAccount.toBase58(),
+        winnerNftTokenAccount: winnerNftTokenAccount.toBase58(),
+        remainingAccounts: remainingAccounts.map(a => a.pubkey.toBase58()),
+        metadataExists: !!metadataAccountInfo,
+      });
+
+      // Build transaction manually for better error handling
+      const tx = await l1Program.methods
         .settleAuction()
         .accounts({
           payer: publicKey,
@@ -489,11 +505,28 @@ export function useAuctionActions(): UseAuctionActionsReturn {
           systemProgram: SystemProgram.programId,
         })
         .remainingAccounts(remainingAccounts)
-        .rpc({ skipPreflight: true });
+        .transaction();
+
+      tx.feePayer = publicKey;
+      const { blockhash, lastValidBlockHeight } =
+        await l1Connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+      tx.lastValidBlockHeight = lastValidBlockHeight;
+
+      const signed = await wallet.signTransaction(tx);
+      const sig = await l1Connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: true,
+      });
+
+      // Wait for confirmation
+      await l1Connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed"
+      );
 
       return sig;
     },
-    [l1Program, l1Connection, publicKey]
+    [l1Program, l1Connection, publicKey, wallet]
   );
 
   // -----------------------------------------------------------------------
