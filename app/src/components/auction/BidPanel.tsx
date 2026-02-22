@@ -20,6 +20,8 @@ interface BidPanelProps {
   userDeposit: number | null;
   /** Progress label shown during multi-step flow */
   progressLabel?: string | null;
+  /** When true, shows "Deposit" instead of "Place Bid" and relaxes min bid validation */
+  depositOnly?: boolean;
 }
 
 function formatSol(lamports: number): string {
@@ -39,6 +41,7 @@ export default function BidPanel({
   isSeller = false,
   userDeposit,
   progressLabel,
+  depositOnly = false,
 }: BidPanelProps) {
   const minBid = useMemo(() => {
     if (auctionState.currentBid > 0) {
@@ -60,7 +63,7 @@ export default function BidPanel({
   const hasEnoughDeposit = depositNeeded === 0;
 
   const handleBid = () => {
-    if (bidLamports >= minBid) {
+    if (depositOnly ? bidLamports > 0 : bidLamports >= minBid) {
       onBid(bidLamports);
     }
   };
@@ -120,20 +123,28 @@ export default function BidPanel({
 
           {/* Info line: what will happen */}
           <div className="space-y-1">
-            <p className="text-center text-[11px] text-cream/30">
-              Minimum bid: {formatSol(minBid)} SOL
-            </p>
-            {!hasEnoughDeposit && bidLamports >= minBid && (
-              <p className="text-center text-[11px] text-gold/60">
-                Will deposit {formatSol(depositNeeded)} SOL first, then place bid
+            {depositOnly ? (
+              <p className="text-center text-[11px] text-cream/30">
+                Reserve price: {formatSol(minBid)} SOL
               </p>
+            ) : (
+              <>
+                <p className="text-center text-[11px] text-cream/30">
+                  Minimum bid: {formatSol(minBid)} SOL
+                </p>
+                {!hasEnoughDeposit && bidLamports >= minBid && (
+                  <p className="text-center text-[11px] text-gold/60">
+                    Will deposit {formatSol(depositNeeded)} SOL first, then place bid
+                  </p>
+                )}
+              </>
             )}
           </div>
 
           {/* Bid button */}
           <button
             onClick={handleBid}
-            disabled={isLoading || bidLamports < minBid}
+            disabled={isLoading || (depositOnly ? bidLamports <= 0 : bidLamports < minBid)}
             className="flex h-12 w-full items-center justify-center rounded-md bg-gold text-sm font-semibold tracking-[0.15em] text-jet uppercase transition-all duration-200 hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isLoading ? (
@@ -145,6 +156,8 @@ export default function BidPanel({
                   </span>
                 )}
               </div>
+            ) : depositOnly ? (
+              "Deposit SOL"
             ) : (
               "Place Bid"
             )}

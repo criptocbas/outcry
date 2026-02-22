@@ -725,6 +725,7 @@ export default function AuctionRoomPage({
                     isLoading={actionLoading}
                     isSeller={false}
                     progressLabel={progressLabel}
+                    depositOnly
                   />
                 </div>
               )}

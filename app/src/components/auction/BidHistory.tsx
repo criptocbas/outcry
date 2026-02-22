@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useTapestryProfile } from "@/hooks/useTapestryProfile";
 
 interface Bid {
   bidder: string;
@@ -30,6 +31,21 @@ function relativeTime(timestamp: number): string {
 
 function formatSol(lamports: number): string {
   return (lamports / 1_000_000_000).toFixed(2);
+}
+
+function BidderName({ wallet }: { wallet: string }) {
+  const { profile } = useTapestryProfile(wallet);
+  const display = profile?.profile.username || truncateAddress(wallet);
+
+  return (
+    <a
+      href={`/profile/${wallet}`}
+      className="text-xs text-[#F5F0E8]/70 transition-colors hover:text-[#C6A961]"
+      style={{ fontFamily: "'DM Sans', sans-serif" }}
+    >
+      {display}
+    </a>
+  );
 }
 
 export default function BidHistory({ bids }: BidHistoryProps) {
@@ -73,14 +89,9 @@ export default function BidHistory({ bids }: BidHistoryProps) {
                   i === 0 ? "" : ""
                 }`}
               >
-                {/* Left: address + time */}
+                {/* Left: name + time */}
                 <div className="flex flex-col">
-                  <span
-                    className="text-xs text-[#F5F0E8]/70"
-                    style={{ fontFamily: "'DM Sans', sans-serif" }}
-                  >
-                    {truncateAddress(bid.bidder)}
-                  </span>
+                  <BidderName wallet={bid.bidder} />
                   <span
                     className="text-[10px] text-[#F5F0E8]/25"
                     style={{ fontFamily: "'DM Sans', sans-serif" }}
