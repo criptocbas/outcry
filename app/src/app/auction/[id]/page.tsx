@@ -157,6 +157,10 @@ export default function AuctionRoomPage({
   const isEnded = statusLabel === "Ended";
   const isSettled = statusLabel === "Settled";
   const isCancelled = statusLabel === "Cancelled";
+  const timerExpired =
+    auction && auction.endTime.toNumber() > 0 &&
+    Math.floor(Date.now() / 1000) >= auction.endTime.toNumber();
+  const canSettle = isEnded || (isActive && timerExpired);
 
   // Fetch user's BidderDeposit PDA (lives on L1, works even when auction is delegated)
   const { deposit: bidderDepositAccount, refetch: refetchDeposit } = useBidderDeposit(
@@ -245,7 +249,21 @@ export default function AuctionRoomPage({
     setProgressLabel(null);
 
     try {
-      // Try to undelegate first (if delegated)
+      // Step 1: End auction if timer expired but status is still Active
+      if (isActive && timerExpired) {
+        setProgressLabel("Ending auction...");
+        try {
+          await actions.endAuction(new PublicKey(id));
+          addToast("Auction ended", "success");
+          await new Promise((r) => setTimeout(r, 2000));
+        } catch (endErr: unknown) {
+          const endMsg = endErr instanceof Error ? endErr.message : "";
+          // Ignore if already ended
+          if (!endMsg.includes("InvalidAuctionStatus")) throw endErr;
+        }
+      }
+
+      // Step 2: Undelegate from ER (if delegated)
       if (isDelegated) {
         setProgressLabel("Returning state to L1...");
         try {
@@ -311,7 +329,7 @@ export default function AuctionRoomPage({
       setActionLoading(false);
       setProgressLabel(null);
     }
-  }, [auction, actions, id, addToast, refetch, publicKey, isDelegated]);
+  }, [auction, actions, id, addToast, refetch, publicKey, isDelegated, isActive, timerExpired]);
 
   // -------------------------------------------------------------------------
   // Claim refund
@@ -553,8 +571,8 @@ export default function AuctionRoomPage({
                 )}
             </div>
 
-            {/* Bid Panel — unified deposit+bid flow (during Active) */}
-            {isActive && !isSeller && (
+            {/* Bid Panel — unified deposit+bid flow (during Active, timer not expired) */}
+            {isActive && !isSeller && !timerExpired && (
               <BidPanel
                 auctionState={{
                   currentBid: auction.currentBid.toNumber(),
@@ -570,8 +588,8 @@ export default function AuctionRoomPage({
               />
             )}
 
-            {/* Seller cannot bid message during active */}
-            {isActive && isSeller && (
+            {/* Seller cannot bid message during active (only while timer running) */}
+            {isActive && isSeller && !timerExpired && (
               <div className="rounded-lg border border-charcoal-light bg-charcoal p-5">
                 <p className="text-center text-xs text-cream/40">
                   You are the seller — you cannot bid on your own auction.
@@ -672,8 +690,8 @@ export default function AuctionRoomPage({
                 </div>
               )}
 
-              {/* Ended: Settle */}
-              {isEnded && (
+              {/* Ended or timer expired: Settle (handles end + undelegate + settle) */}
+              {canSettle && (
                 <button
                   onClick={handleSettle}
                   disabled={actionLoading}
