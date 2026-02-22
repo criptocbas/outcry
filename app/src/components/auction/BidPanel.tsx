@@ -51,11 +51,15 @@ export default function BidPanel({
   }, [auctionState.currentBid, auctionState.reservePrice]);
 
   const [bidInput, setBidInput] = useState<string>(formatSol(minBid));
+  const [userEdited, setUserEdited] = useState(false);
 
-  // Update suggested bid when minBid changes (e.g. someone else bids)
+  // Update suggested bid when minBid changes (e.g. someone else bids),
+  // but only if user hasn't manually typed a custom amount
   useEffect(() => {
-    setBidInput(formatSol(minBid));
-  }, [minBid]);
+    if (!userEdited) {
+      setBidInput(formatSol(minBid));
+    }
+  }, [minBid, userEdited]);
 
   const bidLamports = parseSolToLamports(bidInput);
   const depositNeeded =
@@ -94,7 +98,7 @@ export default function BidPanel({
             {quickBids.map((qb) => (
               <button
                 key={qb.value}
-                onClick={() => setBidInput(formatSol(qb.value))}
+                onClick={() => { setBidInput(formatSol(qb.value)); setUserEdited(false); }}
                 className={`flex-1 rounded-md border py-2 text-xs font-medium tabular-nums transition-all ${
                   bidLamports === qb.value
                     ? "border-gold/50 bg-gold/10 text-gold"
@@ -113,7 +117,7 @@ export default function BidPanel({
               step="0.01"
               min="0"
               value={bidInput}
-              onChange={(e) => setBidInput(e.target.value)}
+              onChange={(e) => { setBidInput(e.target.value); setUserEdited(true); }}
               className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-3 pr-14 text-right text-lg tabular-nums text-cream placeholder-cream/20 outline-none transition-colors focus:border-gold/60"
             />
             <span className="absolute top-1/2 right-4 -translate-y-1/2 text-xs text-cream/30 uppercase">

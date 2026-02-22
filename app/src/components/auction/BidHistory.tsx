@@ -85,9 +85,7 @@ export default function BidHistory({ bids }: BidHistoryProps) {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -24 }}
                 transition={{ duration: 0.3, ease: "easeOut" }}
-                className={`flex items-center justify-between border-b border-[#2A2A2A]/60 py-2.5 ${
-                  i === 0 ? "" : ""
-                }`}
+                className="flex items-center justify-between border-b border-[#2A2A2A]/60 py-2.5"
               >
                 {/* Left: name + time */}
                 <div className="flex flex-col">

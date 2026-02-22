@@ -9,6 +9,9 @@ const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 );
 
+// Reuse a single connection for all metadata fetches
+const metadataConnection = new Connection(DEVNET_RPC, "confirmed");
+
 export interface NftMetadata {
   name: string;
   symbol: string;
@@ -122,8 +125,7 @@ export function useNftMetadata(mintAddress: string | null): {
       try {
         const mint = new PublicKey(mintAddress);
         const metadataPDA = getMetadataPDA(mint);
-        const connection = new Connection(DEVNET_RPC, "confirmed");
-        const accountInfo = await connection.getAccountInfo(metadataPDA);
+        const accountInfo = await metadataConnection.getAccountInfo(metadataPDA);
 
         if (!accountInfo || cancelled) {
           if (!cancelled) setLoading(false);
