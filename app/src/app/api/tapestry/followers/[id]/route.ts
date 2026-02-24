@@ -20,7 +20,7 @@ export async function GET(
 
   try {
     const res = await fetch(
-      `${TAPESTRY_BASE}/profiles/followers/${encodeURIComponent(id)}?apiKey=${API_KEY}&limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`
+      `${TAPESTRY_BASE}/profiles/${encodeURIComponent(id)}/followers?apiKey=${API_KEY}&page=1&pageSize=${encodeURIComponent(limit)}`
     );
     const data = await res.json();
 
@@ -28,7 +28,19 @@ export async function GET(
       return NextResponse.json(data, { status: res.status });
     }
 
-    return NextResponse.json(data);
+    // Normalize profiles: Tapestry returns wallet.id, we need walletAddress
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const profiles = (data.profiles ?? []).map((p: any) => ({
+      profile: {
+        id: p.id ?? p.username,
+        username: p.username ?? p.id,
+        walletAddress: p.wallet?.id ?? p.walletAddress ?? "",
+        bio: p.bio ?? null,
+      },
+      socialCounts: p.socialCounts ?? { followers: 0, following: 0, posts: 0, likes: 0 },
+    }));
+
+    return NextResponse.json({ profiles, total: data.totalCount ?? profiles.length });
   } catch (error) {
     console.error("Tapestry followers fetch error:", error);
     return NextResponse.json(
