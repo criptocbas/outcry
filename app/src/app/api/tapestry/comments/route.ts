@@ -3,6 +3,25 @@ import { NextRequest, NextResponse } from "next/server";
 const TAPESTRY_BASE = "https://api.usetapestry.dev/api/v1";
 const API_KEY = process.env.TAPESTRY_API_KEY;
 
+/**
+ * Ensure a Tapestry content node exists for this auction.
+ * Uses findOrCreate so the first call creates it, subsequent calls are no-ops.
+ */
+async function ensureContentNode(contentId: string, profileId: string) {
+  await fetch(`${TAPESTRY_BASE}/contents/findOrCreate?apiKey=${API_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: contentId,
+      profileId,
+      properties: [
+        { key: "content", value: `Auction ${contentId}` },
+        { key: "contentType", value: "auction" },
+      ],
+    }),
+  });
+}
+
 export async function GET(req: NextRequest) {
   if (!API_KEY) {
     return NextResponse.json(
@@ -26,12 +45,18 @@ export async function GET(req: NextRequest) {
     const res = await fetch(
       `${TAPESTRY_BASE}/comments?contentId=${encodeURIComponent(contentId)}&limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}&apiKey=${API_KEY}`
     );
-    const data = await res.json();
 
+    // If content node doesn't exist yet, return empty rather than error
     if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const msg = JSON.stringify(data);
+      if (msg.includes("Can't find nodes") || msg.includes("not found")) {
+        return NextResponse.json({ comments: [], pagination: { total: 0, limit: 20, offset: 0, hasMore: false } });
+      }
       return NextResponse.json(data, { status: res.status });
     }
 
+    const data = await res.json();
     return NextResponse.json(data);
   } catch (error) {
     console.error("Tapestry comments fetch error:", error);
@@ -60,6 +85,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Ensure the content node exists before attaching a comment
+    await ensureContentNode(contentId, profileId);
 
     const res = await fetch(`${TAPESTRY_BASE}/comments?apiKey=${API_KEY}`, {
       method: "POST",

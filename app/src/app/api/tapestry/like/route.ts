@@ -3,6 +3,25 @@ import { NextRequest, NextResponse } from "next/server";
 const TAPESTRY_BASE = "https://api.usetapestry.dev/api/v1";
 const API_KEY = process.env.TAPESTRY_API_KEY;
 
+/**
+ * Ensure a Tapestry content node exists for this auction.
+ * Uses findOrCreate so the first call creates it, subsequent calls are no-ops.
+ */
+async function ensureContentNode(contentId: string, profileId: string) {
+  await fetch(`${TAPESTRY_BASE}/contents/findOrCreate?apiKey=${API_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: contentId,
+      profileId,
+      properties: [
+        { key: "content", value: `Auction ${contentId}` },
+        { key: "contentType", value: "auction" },
+      ],
+    }),
+  });
+}
+
 export async function POST(req: NextRequest) {
   if (!API_KEY) {
     return NextResponse.json(
@@ -21,6 +40,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Ensure the content node exists before liking it
+    await ensureContentNode(contentId, profileId);
 
     // Tapestry: POST /likes/{nodeId} with { startId } in body
     const res = await fetch(
