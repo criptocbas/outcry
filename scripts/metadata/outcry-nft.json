@@ -1,0 +1,27 @@
+{
+  "name": "OUTCRY Auction NFT",
+  "symbol": "OUTCRY",
+  "description": "Going, going, onchain. A real-time live auction NFT on Solana powered by Ephemeral Rollups.",
+  "image": "https://i.imgur.com/U4wWHzV.jpeg",
+  "external_url": "https://outcry.auction",
+  "seller_fee_basis_points": 500,
+  "attributes": [
+    { "trait_type": "Protocol", "value": "OUTCRY" },
+    { "trait_type": "Network", "value": "Solana Devnet" }
+  ],
+  "properties": {
+    "category": "image",
+    "creators": [
+      {
+        "address": "5KUE3sm7pg2bicvGm8wtn1zyff4h57mmyxShhhiQjHc6",
+        "share": 100
+      }
+    ],
+    "files": [
+      {
+        "uri": "https://i.imgur.com/U4wWHzV.jpeg",
+        "type": "image/jpeg"
+      }
+    ]
+  }
+}
