@@ -69,8 +69,20 @@ export function useAuctionLike(
 
     fetchLikeData();
 
+    // Poll like count every 15s so others' likes show up
+    const interval = setInterval(() => {
+      if (activeKeyRef.current === key) {
+        getLikeCount(auctionId)
+          .then((count) => {
+            if (activeKeyRef.current === key) setLikeCount(count);
+          })
+          .catch(() => {});
+      }
+    }, 15_000);
+
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, [auctionId, userProfileId]);
 
