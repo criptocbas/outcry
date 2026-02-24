@@ -127,11 +127,19 @@ export default function HomePage() {
           variants={fadeUp}
           initial="hidden"
           animate="visible"
-          className="relative mt-16 flex w-full max-w-md items-center"
+          className="relative mt-16 flex w-full max-w-md flex-col items-center gap-4"
         >
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent to-gold/30" />
-          <div className="mx-4 h-2 w-2 rotate-45 border border-gold/40 bg-transparent" />
-          <div className="h-px flex-1 bg-gradient-to-l from-transparent to-gold/30" />
+          <div className="flex w-full items-center">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent to-gold/30" />
+            <div className="mx-4 h-2 w-2 rotate-45 border border-gold/40 bg-transparent" />
+            <div className="h-px flex-1 bg-gradient-to-l from-transparent to-gold/30" />
+          </div>
+          {/* Scroll hint chevron */}
+          <a href="#auctions" className="animate-scroll-hint" aria-label="Scroll to auctions">
+            <svg className="h-5 w-5 text-gold/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </a>
         </motion.div>
       </section>
 
@@ -149,7 +157,7 @@ export default function HomePage() {
         >
           <div className="h-px w-8 bg-gold" />
           <h2 className="text-xs font-medium tracking-[0.3em] text-cream/60 uppercase">
-            Live Auctions
+            Discover
           </h2>
         </motion.div>
 
@@ -177,12 +185,18 @@ export default function HomePage() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="flex flex-col items-center justify-center py-24"
           >
+            <svg className="mb-4 h-12 w-12 text-cream/10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V4.5a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v15a1.5 1.5 0 001.5 1.5z" />
+            </svg>
             <p className="font-serif text-xl italic text-cream/30">
-              No auctions yet &mdash; be the first to list
+              No auctions yet
+            </p>
+            <p className="mt-2 max-w-xs text-center text-sm text-cream/20">
+              Be the first to list your artwork and let collectors compete in real-time.
             </p>
             <Link
               href="/auction/create"
-              className="mt-6 text-xs font-medium tracking-[0.15em] text-gold/70 uppercase transition-colors hover:text-gold"
+              className="mt-6 flex h-10 items-center justify-center rounded-md border border-gold/40 px-6 text-xs font-semibold tracking-[0.15em] text-gold uppercase transition-all duration-200 hover:border-gold hover:bg-gold/5"
             >
               Create an Auction
             </Link>

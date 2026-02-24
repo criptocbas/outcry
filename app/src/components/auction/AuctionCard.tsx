@@ -1,10 +1,11 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import AuctionStatus from "./AuctionStatus";
-import CountdownTimer from "./CountdownTimer";
 import NftImage from "./NftImage";
+import { formatTimeRemaining } from "@/lib/utils";
 
 interface AuctionStatus_t {
   created?: Record<string, never>;
@@ -53,7 +54,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
       <motion.div
         whileHover={{ scale: 1.02 }}
         transition={{ duration: 0.25, ease: "easeOut" }}
-        className="group cursor-pointer overflow-hidden rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] transition-all duration-300 hover:border-[#C6A961]/40 hover:shadow-[0_0_20px_rgba(198,169,97,0.08)]"
+        className="group cursor-pointer overflow-hidden rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] transition-all duration-300 hover:border-[#C6A961]/60 hover:shadow-[0_0_20px_rgba(198,169,97,0.15)]"
       >
         {/* NFT Artwork */}
         <div className="relative aspect-square w-full">
@@ -121,13 +122,45 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
           {/* Footer: timer */}
           {statusKey === "active" && (
             <div className="border-t border-[#2A2A2A] pt-2">
-              <div className="scale-75 origin-left">
-                <CountdownTimer endTime={auction.endTime} status={statusKey} />
-              </div>
+              <TimeRemaining endTime={auction.endTime} />
             </div>
           )}
         </div>
       </motion.div>
     </Link>
+  );
+}
+
+function TimeRemaining({ endTime }: { endTime: number }) {
+  const [display, setDisplay] = useState(() => formatTimeRemaining(endTime));
+
+  useEffect(() => {
+    const id = setInterval(() => setDisplay(formatTimeRemaining(endTime)), 1000);
+    return () => clearInterval(id);
+  }, [endTime]);
+
+  const now = Math.floor(Date.now() / 1000);
+  const remaining = endTime - now;
+  const isUrgent = remaining > 0 && remaining < 300;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <svg
+        className={`h-3 w-3 ${isUrgent ? "text-red-400" : "text-cream/30"}`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+      </svg>
+      <span
+        className={`text-xs tabular-nums ${
+          isUrgent ? "font-semibold text-red-400" : "text-cream/50"
+        }`}
+      >
+        {display}
+      </span>
+    </div>
   );
 }

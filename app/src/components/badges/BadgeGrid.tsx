@@ -12,7 +12,7 @@ interface BadgeGridProps {
 export default function BadgeGrid({ badges, loading }: BadgeGridProps) {
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
@@ -43,7 +43,7 @@ export default function BadgeGrid({ badges, loading }: BadgeGridProps) {
         hidden: {},
         visible: { transition: { staggerChildren: 0.08 } },
       }}
-      className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+      className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
     >
       {badges.map((badge) => (
         <BadgeCard key={badge.id} badge={badge} />

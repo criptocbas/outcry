@@ -13,6 +13,8 @@ import {
 } from "@/lib/constants";
 import { useAuctionActions } from "@/hooks/useAuctionActions";
 import { getAuctionPDA } from "@/lib/program";
+import { useNftMetadata } from "@/hooks/useNftMetadata";
+import NftImage from "@/components/auction/NftImage";
 
 // ---------------------------------------------------------------------------
 // Duration options
@@ -222,7 +224,7 @@ export default function CreateAuctionPage() {
         animate="visible"
         className="relative z-10 w-full max-w-lg"
       >
-        <div className="rounded-xl border border-charcoal-light bg-charcoal p-8 sm:p-10">
+        <div className="rounded-xl border border-[#333] bg-charcoal p-8 sm:p-10">
           {/* Heading */}
           <motion.h1
             custom={0.05}
@@ -276,11 +278,12 @@ export default function CreateAuctionPage() {
                 onChange={(e) => setNftMint(e.target.value)}
                 placeholder="e.g. 7xKXtg2CW87d97TXJSDp..."
                 required
-                className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-3 text-sm text-cream placeholder-cream/20 outline-none transition-colors focus:border-gold/60"
+                className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-3 text-sm text-cream placeholder-cream/20 focus-gold"
               />
               <p className="text-[11px] text-cream/25">
                 Enter the mint address of your NFT
               </p>
+              <NftPreview mintAddress={nftMint.trim()} />
             </motion.div>
 
             {/* Reserve Price */}
@@ -302,7 +305,7 @@ export default function CreateAuctionPage() {
                   value={reservePrice}
                   onChange={(e) => setReservePrice(e.target.value)}
                   required
-                  className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-3 pr-14 text-right text-sm tabular-nums text-cream placeholder-cream/20 outline-none transition-colors focus:border-gold/60"
+                  className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-3 pr-14 text-right text-sm tabular-nums text-cream placeholder-cream/20 focus-gold"
                 />
                 <span className="absolute top-1/2 right-4 -translate-y-1/2 text-xs text-cream/30 uppercase">
                   SOL
@@ -328,7 +331,7 @@ export default function CreateAuctionPage() {
                 <select
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
-                  className="w-full appearance-none rounded-md border border-charcoal-light bg-jet px-4 py-3 text-sm text-cream outline-none transition-colors focus:border-gold/60"
+                  className="w-full appearance-none rounded-md border border-charcoal-light bg-jet px-4 py-3 text-sm text-cream focus-gold"
                 >
                   {DURATION_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -375,7 +378,7 @@ export default function CreateAuctionPage() {
                   value={minBidIncrement}
                   onChange={(e) => setMinBidIncrement(e.target.value)}
                   required
-                  className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-3 pr-14 text-right text-sm tabular-nums text-cream placeholder-cream/20 outline-none transition-colors focus:border-gold/60"
+                  className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-3 pr-14 text-right text-sm tabular-nums text-cream placeholder-cream/20 focus-gold"
                 />
                 <span className="absolute top-1/2 right-4 -translate-y-1/2 text-xs text-cream/30 uppercase">
                   SOL
@@ -419,6 +422,41 @@ export default function CreateAuctionPage() {
           </p>
         </div>
       </motion.form>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// NftPreview — shows NFT image + name when a valid mint is entered
+// ---------------------------------------------------------------------------
+
+function NftPreview({ mintAddress }: { mintAddress: string }) {
+  // Only attempt fetch if it looks like a valid base58 pubkey (32-44 chars)
+  const isValid = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mintAddress);
+  const { metadata, loading } = useNftMetadata(isValid ? mintAddress : null);
+
+  if (!isValid || (!loading && !metadata)) return null;
+
+  if (loading) {
+    return (
+      <div className="mt-2 flex items-center gap-3 rounded-lg border border-charcoal-light bg-jet p-3">
+        <div className="h-12 w-12 animate-shimmer rounded-md" />
+        <div className="h-3 w-24 animate-shimmer rounded" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-3 rounded-lg border border-gold/20 bg-jet p-3">
+      <div className="h-12 w-12 overflow-hidden rounded-md">
+        <NftImage mintAddress={mintAddress} className="h-full w-full" />
+      </div>
+      <div className="flex flex-col">
+        <span className="text-sm font-medium text-cream/80">{metadata?.name ?? "Unknown NFT"}</span>
+        {metadata?.symbol && (
+          <span className="text-[10px] text-cream/30 uppercase">{metadata.symbol}</span>
+        )}
+      </div>
     </div>
   );
 }

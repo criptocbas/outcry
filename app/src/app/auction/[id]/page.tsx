@@ -625,7 +625,7 @@ export default function AuctionRoomPage({
                   <span
                     className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium tracking-[0.1em] uppercase ${
                       isDelegated
-                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 animate-er-glow"
                         : "border-cream/10 bg-cream/5 text-cream/30"
                     }`}
                   >
@@ -659,7 +659,7 @@ export default function AuctionRoomPage({
             {/* Current bid display — with flash animation */}
             <div
               className={`flex flex-col items-center rounded-lg border border-charcoal-light bg-charcoal px-6 py-5 transition-all duration-300 ${
-                bidFlash ? "border-gold/60 shadow-[0_0_20px_rgba(198,169,97,0.15)]" : ""
+                bidFlash ? "border-gold/60 shadow-[0_0_40px_rgba(198,169,97,0.25)] animate-bid-flash" : ""
               }`}
             >
               <span className="mb-1 text-[10px] tracking-[0.25em] text-cream/40 uppercase">
@@ -670,7 +670,7 @@ export default function AuctionRoomPage({
               <div className="flex items-baseline gap-2">
                 <motion.span
                   key={auction.currentBid.toString()}
-                  initial={prevBid !== null ? { scale: 1.15, color: "#D4B872" } : false}
+                  initial={prevBid !== null ? { scale: 1.25, color: "#D4B872" } : false}
                   animate={{ scale: 1, color: "#C6A961" }}
                   transition={{ duration: 0.5, ease: "easeOut" }}
                   className="text-4xl font-bold tabular-nums text-gold"
@@ -733,7 +733,7 @@ export default function AuctionRoomPage({
                       <div className="flex items-center gap-2">
                         <Spinner />
                         {progressLabel && (
-                          <span className="text-xs font-medium normal-case tracking-normal">
+                          <span className="text-sm font-semibold normal-case tracking-normal">
                             {progressLabel}
                           </span>
                         )}
@@ -760,7 +760,7 @@ export default function AuctionRoomPage({
                       <div className="flex items-center gap-2">
                         <Spinner />
                         {progressLabel && (
-                          <span className="text-xs font-medium normal-case tracking-normal">
+                          <span className="text-sm font-semibold normal-case tracking-normal">
                             {progressLabel}
                           </span>
                         )}
@@ -824,7 +824,7 @@ export default function AuctionRoomPage({
                     <div className="flex items-center gap-2">
                       <Spinner />
                       {progressLabel && (
-                        <span className="text-xs font-medium normal-case tracking-normal">
+                        <span className="text-sm font-semibold normal-case tracking-normal">
                           {progressLabel}
                         </span>
                       )}

@@ -177,11 +177,11 @@ export default function ProfilePage({
         animate="visible"
         className="flex flex-col items-center gap-6 border-b border-charcoal-light pb-8"
       >
-        <ProfileBadge walletAddress={address} size="lg" />
+        <ProfileBadge walletAddress={address} size="lg" avatarOnly />
 
         {/* Username */}
         {profile && !editing && (
-          <div className="flex items-center gap-2">
+          <div className="group/name flex items-center gap-2">
             <h1 className="text-xl font-bold text-cream">
               {profile.profile.username}
             </h1>
@@ -192,9 +192,12 @@ export default function ProfilePage({
                   setEditError(null);
                   setEditing(true);
                 }}
-                className="text-xs text-cream/30 transition-colors hover:text-gold"
+                className="opacity-0 transition-opacity group-hover/name:opacity-100"
+                aria-label="Edit username"
               >
-                edit
+                <svg className="h-4 w-4 text-cream/30 transition-colors hover:text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                </svg>
               </button>
             )}
           </div>
@@ -213,7 +216,7 @@ export default function ProfilePage({
               }}
               maxLength={30}
               autoFocus
-              className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-2 text-center text-sm text-cream placeholder-cream/20 outline-none transition-colors focus:border-gold/60"
+              className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-2 text-center text-sm text-cream placeholder-cream/20 focus-gold"
             />
             {editError && (
               <p className="text-xs text-red-400">{editError}</p>
@@ -272,7 +275,7 @@ export default function ProfilePage({
               onKeyDown={(e) => e.key === "Enter" && handleRegister()}
               placeholder="Choose a username"
               maxLength={30}
-              className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-2.5 text-center text-sm text-cream placeholder-cream/20 outline-none transition-colors focus:border-gold/60"
+              className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-2.5 text-center text-sm text-cream placeholder-cream/20 focus-gold"
             />
             {registerError && (
               <p className="text-xs text-red-400">{registerError}</p>
@@ -303,7 +306,7 @@ export default function ProfilePage({
         className="mt-8"
       >
         <h2 className="mb-4 text-xs font-medium tracking-[0.2em] text-cream/40 uppercase">
-          Auction Badges
+          Auction Badges{!badgesLoading && badges.length > 0 && ` (${badges.length})`}
         </h2>
         <BadgeGrid badges={badges} loading={badgesLoading} />
       </motion.div>

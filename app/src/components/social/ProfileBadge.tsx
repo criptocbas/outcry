@@ -10,6 +10,7 @@ import { truncateAddress } from "@/lib/utils";
 interface ProfileBadgeProps {
   walletAddress: string;
   size?: "sm" | "md" | "lg";
+  avatarOnly?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -44,6 +45,7 @@ function avatarLetter(username: string | undefined, wallet: string): string {
 export default function ProfileBadge({
   walletAddress,
   size = "sm",
+  avatarOnly = false,
 }: ProfileBadgeProps) {
   const { profile, loading } = useTapestryProfile(walletAddress);
 
@@ -100,20 +102,22 @@ export default function ProfileBadge({
       </div>
 
       {/* Name + follower count */}
-      <div className={`flex flex-col leading-tight ${isLg ? "items-center" : ""}`}>
-        <span
-          className={`${nameSize} font-medium text-cream/90 truncate ${isLg ? "max-w-[240px]" : "max-w-[120px]"}`}
-          style={{ fontFamily: isLg ? "var(--font-serif)" : "var(--font-sans)" }}
-        >
-          {displayName}
-        </span>
-        <span
-          className={`${countSize} text-muted`}
-          style={{ fontFamily: "var(--font-sans)" }}
-        >
-          {followers} {followers === 1 ? "follower" : "followers"}
-        </span>
-      </div>
+      {!avatarOnly && (
+        <div className={`flex flex-col leading-tight ${isLg ? "items-center" : ""}`}>
+          <span
+            className={`${nameSize} font-medium text-cream/90 truncate ${isLg ? "max-w-[240px]" : "max-w-[120px]"}`}
+            style={{ fontFamily: isLg ? "var(--font-serif)" : "var(--font-sans)" }}
+          >
+            {displayName}
+          </span>
+          <span
+            className={`${countSize} text-muted`}
+            style={{ fontFamily: "var(--font-sans)" }}
+          >
+            {followers} {followers === 1 ? "follower" : "followers"}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

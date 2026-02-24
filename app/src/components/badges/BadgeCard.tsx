@@ -60,7 +60,7 @@ export default function BadgeCard({ badge }: { badge: Badge }) {
           <span className="text-[10px] font-medium tracking-[0.15em] text-cream/40 uppercase">
             {style.label}
           </span>
-          <span className="text-xs font-medium text-cream/70 truncate max-w-[140px]">
+          <span className="text-xs font-medium text-cream/70 truncate max-w-full">
             {badge.auctionName}
           </span>
         </div>

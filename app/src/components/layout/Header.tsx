@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
@@ -10,6 +10,7 @@ export default function Header() {
   const { publicKey } = useWallet();
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -17,6 +18,9 @@ export default function Header() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Close mobile nav on route change (link click)
+  const closeMobile = () => setMobileOpen(false);
 
   return (
     <motion.header
@@ -46,14 +50,14 @@ export default function Header() {
           </span>
         </Link>
 
-        {/* Center: Nav */}
+        {/* Center: Desktop Nav */}
         <nav className="hidden items-center gap-2 sm:flex">
           <NavLink href="/#auctions">Discover</NavLink>
-          <NavDot />
+          <NavSlash />
           <NavLink href="/auction/create">Create</NavLink>
           {publicKey && (
             <>
-              <NavDot />
+              <NavSlash />
               <NavLink href={`/profile/${publicKey.toBase58()}`}>
                 Profile
               </NavLink>
@@ -61,8 +65,8 @@ export default function Header() {
           )}
         </nav>
 
-        {/* Right: Wallet — only render after mount to avoid hydration mismatch */}
-        <div className="flex items-center">
+        {/* Right: Wallet + Hamburger */}
+        <div className="flex items-center gap-3">
           {mounted && (
             <WalletMultiButton
               style={{
@@ -81,15 +85,59 @@ export default function Header() {
               }}
             />
           )}
+
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={() => setMobileOpen((v) => !v)}
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-[#C6A961]/30 text-[#C6A961] transition-colors hover:bg-[#C6A961]/10 sm:hidden"
+            aria-label="Toggle menu"
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              {mobileOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
         </div>
       </div>
+
+      {/* Mobile dropdown */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.nav
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="overflow-hidden border-t border-[#C6A961]/10 bg-[#050505]/95 backdrop-blur-xl sm:hidden"
+          >
+            <div className="flex flex-col gap-1 px-6 py-4">
+              <MobileNavLink href="/#auctions" onClick={closeMobile}>Discover</MobileNavLink>
+              <MobileNavLink href="/auction/create" onClick={closeMobile}>Create</MobileNavLink>
+              {publicKey && (
+                <MobileNavLink href={`/profile/${publicKey.toBase58()}`} onClick={closeMobile}>
+                  Profile
+                </MobileNavLink>
+              )}
+            </div>
+          </motion.nav>
+        )}
+      </AnimatePresence>
     </motion.header>
   );
 }
 
-function NavDot() {
+function NavSlash() {
   return (
-    <span className="text-[8px] text-[#C6A961]/60 select-none">&#9679;</span>
+    <span className="text-[10px] text-[#C6A961]/40 select-none">/</span>
   );
 }
 
@@ -104,6 +152,27 @@ function NavLink({
     <Link
       href={href}
       className="text-xs tracking-[0.15em] text-[#F5F0E8]/70 uppercase transition-colors duration-200 hover:text-[#C6A961]"
+      style={{ fontFamily: "'DM Sans', sans-serif" }}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function MobileNavLink({
+  href,
+  onClick,
+  children,
+}: {
+  href: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="rounded-md px-3 py-2.5 text-sm tracking-[0.1em] text-[#F5F0E8]/70 uppercase transition-colors duration-200 hover:bg-[#C6A961]/10 hover:text-[#C6A961]"
       style={{ fontFamily: "'DM Sans', sans-serif" }}
     >
       {children}
