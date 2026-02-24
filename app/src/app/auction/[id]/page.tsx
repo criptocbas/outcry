@@ -217,6 +217,10 @@ export default function AuctionRoomPage({
     auction && auction.endTime.toNumber() > 0 &&
     Math.floor(Date.now() / 1000) >= auction.endTime.toNumber();
   const canSettle = !isSettled && !isCancelled && (isEnded || (isActive && timerExpired));
+  const isWinner =
+    auction && publicKey && auction.highestBidder
+      ? auction.highestBidder.toBase58() === publicKey.toBase58()
+      : false;
 
   // Fetch user's BidderDeposit PDA (lives on L1, works even when auction is delegated)
   const { deposit: bidderDepositAccount, refetch: refetchDeposit } = useBidderDeposit(
@@ -393,7 +397,7 @@ export default function AuctionRoomPage({
           throw new Error(`Settle failed: ${settleMsg || "Unknown error"}`);
         }
       }
-      await refetch();
+      await Promise.all([refetch(), refetchDeposit()]);
 
       // Post auction result to Tapestry (best-effort)
       if (publicKey) {
@@ -794,8 +798,8 @@ export default function AuctionRoomPage({
                 </button>
               )}
 
-              {/* Settled or Cancelled or Ended: Claim Refund */}
-              {(isSettled || isCancelled || isEnded) && userDeposit && userDeposit > 0 && (
+              {/* Settled or Cancelled or Ended: Claim Refund (not for winner — their deposit was used) */}
+              {(isSettled || isCancelled || isEnded) && !isWinner && userDeposit && userDeposit > 0 && (
                 <button
                   onClick={handleClaimRefund}
                   disabled={actionLoading}
