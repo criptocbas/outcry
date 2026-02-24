@@ -836,7 +836,7 @@ export default function AuctionRoomPage({
               )}
 
               {/* Settled or Cancelled or Ended: Claim Refund (not for winner — their deposit was used) */}
-              {(isSettled || isCancelled || isEnded) && !isWinner && userDeposit && userDeposit > 0 && (
+              {(isSettled || isCancelled || isEnded) && !isWinner && userDeposit != null && userDeposit > 0 && (
                 <button
                   onClick={handleClaimRefund}
                   disabled={actionLoading}
