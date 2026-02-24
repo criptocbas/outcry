@@ -63,14 +63,27 @@ export function useAuctionComments(
     }
   }, [auctionId]);
 
-  // Fetch on mount / auctionId change.
+  // Fetch on mount / auctionId change, then poll every 10s for new comments.
   useEffect(() => {
     fetchComments();
 
+    const interval = setInterval(() => {
+      if (activeIdRef.current === auctionId) {
+        getComments(auctionId, 50, 0)
+          .then((result) => {
+            if (activeIdRef.current === auctionId) {
+              setComments(result.comments);
+            }
+          })
+          .catch(() => {});
+      }
+    }, 10_000);
+
     return () => {
       activeIdRef.current = null;
+      clearInterval(interval);
     };
-  }, [fetchComments]);
+  }, [fetchComments, auctionId]);
 
   // Post a new comment and optimistically prepend it.
   const postComment = useCallback(
