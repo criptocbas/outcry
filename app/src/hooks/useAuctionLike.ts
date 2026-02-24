@@ -31,9 +31,10 @@ export function useAuctionLike(
   const [likeCount, setLikeCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // Guard stale responses.
   const activeKeyRef = useRef<string | null>(null);
+  const pollingRef = useRef(false);
 
+  // Initial fetch
   useEffect(() => {
     if (!auctionId) return;
 
@@ -45,13 +46,11 @@ export function useAuctionLike(
     async function fetchLikeData() {
       setLoading(true);
       try {
-        // Fetch count for all users.
         const count = await getLikeCount(auctionId);
         if (!cancelled && activeKeyRef.current === key) {
           setLikeCount(count);
         }
 
-        // Check individual like status only if logged in.
         if (userProfileId) {
           const status = await checkLikeStatus(userProfileId, auctionId);
           if (!cancelled && activeKeyRef.current === key) {
@@ -61,7 +60,7 @@ export function useAuctionLike(
           if (!cancelled) setHasLiked(false);
         }
       } catch {
-        // Silently ignore -- defaults are fine (0 likes, not liked).
+        // Silently ignore
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -69,21 +68,27 @@ export function useAuctionLike(
 
     fetchLikeData();
 
-    // Poll like count every 15s so others' likes show up
+    // Poll like count every 15s with overlap guard
     const interval = setInterval(() => {
-      if (activeKeyRef.current === key) {
-        getLikeCount(auctionId)
-          .then((count) => {
-            if (activeKeyRef.current === key) setLikeCount(count);
-          })
-          .catch(() => {});
-      }
+      if (pollingRef.current || activeKeyRef.current !== key) return;
+      pollingRef.current = true;
+
+      getLikeCount(auctionId)
+        .then((count) => {
+          if (activeKeyRef.current === key) setLikeCount(count);
+        })
+        .catch(() => {})
+        .finally(() => {
+          pollingRef.current = false;
+        });
     }, 15_000);
 
     return () => {
       cancelled = true;
+      activeKeyRef.current = null;
       clearInterval(interval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auctionId, userProfileId]);
 
   const toggle = useCallback(async () => {
@@ -101,7 +106,7 @@ export function useAuctionLike(
         setLikeCount((prev) => prev + 1);
       }
     } catch {
-      // Silently ignore -- state stays as is on failure.
+      // Silently ignore
     } finally {
       setLoading(false);
     }

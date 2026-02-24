@@ -31,9 +31,8 @@ export function useAuctionComments(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Track active fetch so stale responses from a different auctionId
-  // don't overwrite state.
   const activeIdRef = useRef<string | null>(null);
+  const pollingRef = useRef(false);
 
   const fetchComments = useCallback(async () => {
     if (!auctionId) {
@@ -51,8 +50,6 @@ export function useAuctionComments(
         setComments(result.comments);
       }
     } catch {
-      // Tapestry may not have a content entry for this auction yet.
-      // Treat as empty rather than showing an error.
       if (activeIdRef.current === auctionId) {
         setComments([]);
       }
@@ -63,27 +60,37 @@ export function useAuctionComments(
     }
   }, [auctionId]);
 
-  // Fetch on mount / auctionId change, then poll every 10s for new comments.
+  // Initial fetch + poll every 15s
   useEffect(() => {
+    if (!auctionId) return;
+
+    activeIdRef.current = auctionId;
     fetchComments();
 
     const interval = setInterval(() => {
-      if (activeIdRef.current === auctionId) {
-        getComments(auctionId, 50, 0)
-          .then((result) => {
-            if (activeIdRef.current === auctionId) {
-              setComments(result.comments);
-            }
-          })
-          .catch(() => {});
-      }
-    }, 10_000);
+      // Skip if a poll is already in flight
+      if (pollingRef.current || activeIdRef.current !== auctionId) return;
+      pollingRef.current = true;
+
+      getComments(auctionId, 50, 0)
+        .then((result) => {
+          if (activeIdRef.current === auctionId) {
+            setComments(result.comments);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          pollingRef.current = false;
+        });
+    }, 15_000);
 
     return () => {
       activeIdRef.current = null;
       clearInterval(interval);
     };
-  }, [fetchComments, auctionId]);
+    // Only re-run when auctionId actually changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auctionId]);
 
   // Post a new comment and optimistically prepend it.
   const postComment = useCallback(
@@ -96,13 +103,12 @@ export function useAuctionComments(
           auctionId,
           text.trim()
         );
-        // Prepend to give immediate feedback (newest first).
         setComments((prev) => [newComment, ...prev]);
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : "Failed to post comment";
         setError(message);
-        throw err; // Re-throw so the UI can handle it.
+        throw err;
       }
     },
     [userProfileId, auctionId]

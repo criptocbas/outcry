@@ -57,7 +57,6 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await res.json();
-    console.log("[tapestry] GET comments raw response:", JSON.stringify(data).slice(0, 500));
 
     // Tapestry returns: { comments: [{ comment: { id, text, created_at }, author: { id, username }, ... }] }
     // Normalize to our flat Comment interface.
