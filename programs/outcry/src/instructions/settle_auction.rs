@@ -43,7 +43,13 @@ fn parse_metadata_royalties(data: &[u8]) -> Result<(u16, Vec<MetaplexCreator>)> 
                 .try_into()
                 .map_err(|_| error!(OutcryError::InvalidMetadata))?,
         ) as usize;
-        offset += 4 + len;
+        // Bounds check: ensure offset + 4 + len doesn't overflow or exceed data
+        let new_offset = offset
+            .checked_add(4)
+            .and_then(|o| o.checked_add(len))
+            .ok_or(error!(OutcryError::InvalidMetadata))?;
+        require!(new_offset <= data.len(), OutcryError::InvalidMetadata);
+        offset = new_offset;
     }
 
     // Read seller_fee_basis_points (u16, little-endian)
@@ -173,6 +179,12 @@ pub struct SettleAuction<'info> {
 
 pub fn handle_settle_auction(ctx: Context<SettleAuction>) -> Result<()> {
     let auction = &mut ctx.accounts.auction_state;
+
+    // ATOMIC: Set Settled immediately to prevent double-settle attacks.
+    // If anything below fails, the auction is still Settled — but that's safer
+    // than allowing two concurrent settlements to both transfer funds.
+    auction.status = AuctionStatus::Settled;
+
     let winning_bid = auction.current_bid;
     let winner_key = auction.highest_bidder;
 
@@ -261,9 +273,6 @@ pub fn handle_settle_auction(ctx: Context<SettleAuction>) -> Result<()> {
         ),
         1,
     )?;
-
-    // --- Update auction status ---
-    ctx.accounts.auction_state.status = AuctionStatus::Settled;
 
     emit!(AuctionSettled {
         auction: ctx.accounts.auction_state.key(),

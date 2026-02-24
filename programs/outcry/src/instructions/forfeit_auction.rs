@@ -75,6 +75,9 @@ pub struct ForfeitAuction<'info> {
 }
 
 pub fn handle_forfeit_auction(ctx: Context<ForfeitAuction>) -> Result<()> {
+    // ATOMIC: Set Settled immediately to prevent double-forfeit attacks.
+    ctx.accounts.auction_state.status = AuctionStatus::Settled;
+
     let winning_bid = ctx.accounts.auction_state.current_bid;
     let highest_bidder = ctx.accounts.auction_state.highest_bidder;
     let seller_key = ctx.accounts.auction_state.seller;
@@ -107,9 +110,14 @@ pub fn handle_forfeit_auction(ctx: Context<ForfeitAuction>) -> Result<()> {
         **seller_info.try_borrow_mut_lamports()? += winner_deposit_amount;
 
         // Zero out the deposit so winner can't also claim a refund.
-        // BidderDeposit layout: [8 disc][32 auction][32 bidder][8 amount][1 bump]
+        // Use proper Anchor serialization to avoid fragile hardcoded offsets.
         let mut data = ctx.accounts.winner_deposit.try_borrow_mut_data()?;
-        data[72..80].copy_from_slice(&0u64.to_le_bytes());
+        let mut slice: &[u8] = &data;
+        let mut deposit = BidderDeposit::try_deserialize(&mut slice)
+            .map_err(|_| error!(OutcryError::InvalidAuctionStatus))?;
+        deposit.amount = 0;
+        let mut writer: &mut [u8] = &mut data[..];
+        deposit.try_serialize(&mut writer)?;
         drop(data);
     }
 
@@ -133,9 +141,6 @@ pub fn handle_forfeit_auction(ctx: Context<ForfeitAuction>) -> Result<()> {
         ),
         1,
     )?;
-
-    // Mark as Settled so losers can claim refunds
-    ctx.accounts.auction_state.status = AuctionStatus::Settled;
 
     emit!(AuctionSettled {
         auction: ctx.accounts.auction_state.key(),

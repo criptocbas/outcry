@@ -5,7 +5,7 @@ use crate::{
     constants::*,
     errors::OutcryError,
     events::DepositMade,
-    state::{AuctionVault, BidderDeposit},
+    state::{AuctionState, AuctionStatus, AuctionVault, BidderDeposit},
 };
 
 #[derive(Accounts)]
@@ -42,6 +42,25 @@ pub struct Deposit<'info> {
 
 pub fn handle_deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     require!(amount > 0, OutcryError::InvalidDepositAmount);
+
+    // Reject deposits after auction has ended/settled/cancelled.
+    // When auction is delegated to ER, its owner changes to the delegation program
+    // and we can't deserialize — but that means it's Active, so deposits are valid.
+    let auction_info = &ctx.accounts.auction_state;
+    if auction_info.owner == &crate::ID {
+        let data = auction_info.try_borrow_data()?;
+        if data.len() >= 8 + AuctionState::SPACE - 8 {
+            let mut slice: &[u8] = &data;
+            if let Ok(auction) = AuctionState::try_deserialize(&mut slice) {
+                require!(
+                    auction.status == AuctionStatus::Created
+                        || auction.status == AuctionStatus::Active,
+                    OutcryError::InvalidAuctionStatus
+                );
+            }
+        }
+        drop(data);
+    }
 
     let deposit = &mut ctx.accounts.bidder_deposit;
     let auction_key = ctx.accounts.auction_state.key();
