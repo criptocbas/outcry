@@ -34,8 +34,6 @@ pub enum OutcryError {
     ArithmeticOverflow,
     #[msg("Seller cannot bid on their own auction")]
     SellerCannotBid,
-    #[msg("Maximum number of bidders reached")]
-    AuctionFull,
     #[msg("Cannot close auction with outstanding deposits — all bidders must claim refunds first")]
     OutstandingDeposits,
     #[msg("Cannot close auction while escrow still holds tokens")]
@@ -50,4 +48,10 @@ pub enum OutcryError {
     ForfeitNotNeeded,
     #[msg("Invalid protocol treasury account")]
     InvalidTreasury,
+    #[msg("Auction has no bids to settle")]
+    NoBidsToSettle,
+    #[msg("Minimum bid increment must be greater than zero")]
+    InvalidBidIncrement,
+    #[msg("Could not deserialize deposit account data")]
+    InvalidDepositAccount,
 }

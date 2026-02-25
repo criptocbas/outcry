@@ -2,7 +2,8 @@ use anchor_lang::prelude::*;
 use ephemeral_rollups_sdk::anchor::commit;
 use ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts;
 
-use crate::state::AuctionState;
+use crate::errors::OutcryError;
+use crate::state::{AuctionState, AuctionStatus};
 
 /// Commits the AuctionState and undelegates it back to L1.
 /// Called after end_auction sets status to Ended. Sends to ER endpoint.
@@ -15,7 +16,11 @@ pub struct UndelegateAuction<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = auction_state.status == AuctionStatus::Ended @ OutcryError::InvalidAuctionStatus,
+        constraint = auction_state.seller == payer.key() @ OutcryError::UnauthorizedSeller,
+    )]
     pub auction_state: Account<'info, AuctionState>,
 }
 

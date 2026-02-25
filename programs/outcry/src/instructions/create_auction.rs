@@ -73,6 +73,7 @@ pub fn handle_create_auction(
         duration_seconds >= MIN_AUCTION_DURATION && duration_seconds <= MAX_AUCTION_DURATION,
         OutcryError::InvalidDuration
     );
+    require!(min_bid_increment > 0, OutcryError::InvalidBidIncrement);
 
     let auction_state = &mut ctx.accounts.auction_state;
     auction_state.seller = ctx.accounts.seller.key();

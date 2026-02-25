@@ -75,11 +75,12 @@ fn parse_metadata_royalties(data: &[u8]) -> Result<(u16, Vec<MetaplexCreator>)> 
             require!(offset + 34 <= data.len(), OutcryError::InvalidMetadata);
             let address = Pubkey::try_from(&data[offset..offset + 32])
                 .map_err(|_| error!(OutcryError::InvalidMetadata))?;
-            // Skip verified flag (offset + 32) — we pay all listed creators
+            let verified = data[offset + 32] == 1;
             let share = data[offset + 33];
             offset += 34;
 
-            if share > 0 {
+            // Only pay verified creators — enforces Metaplex royalty standards
+            if share > 0 && verified {
                 creators.push(MetaplexCreator { address, share });
             }
         }
@@ -97,7 +98,7 @@ pub struct SettleAuction<'info> {
     #[account(
         mut,
         constraint = auction_state.status == AuctionStatus::Ended @ OutcryError::InvalidAuctionStatus,
-        constraint = auction_state.bid_count > 0 @ OutcryError::CannotCancelWithBids,
+        constraint = auction_state.bid_count > 0 @ OutcryError::NoBidsToSettle,
     )]
     pub auction_state: Account<'info, AuctionState>,
 
@@ -230,11 +231,15 @@ pub fn handle_settle_auction(ctx: Context<SettleAuction>) -> Result<()> {
                 OutcryError::MissingCreatorAccount
             );
 
-            let creator_royalty = (total_royalties as u128)
-                .checked_mul(creator.share as u128)
-                .ok_or(OutcryError::ArithmeticOverflow)?
-                .checked_div(100)
-                .ok_or(OutcryError::ArithmeticOverflow)? as u64;
+            // Cap each payout so distributed total never exceeds total_royalties
+            let creator_royalty = std::cmp::min(
+                (total_royalties as u128)
+                    .checked_mul(creator.share as u128)
+                    .ok_or(OutcryError::ArithmeticOverflow)?
+                    .checked_div(100)
+                    .ok_or(OutcryError::ArithmeticOverflow)? as u64,
+                total_royalties.saturating_sub(distributed_royalties),
+            );
 
             if creator_royalty > 0 {
                 **vault_info.try_borrow_mut_lamports()? -= creator_royalty;

@@ -117,7 +117,7 @@ pub fn handle_forfeit_auction(ctx: Context<ForfeitAuction>) -> Result<()> {
         let mut data = ctx.accounts.winner_deposit.try_borrow_mut_data()?;
         let mut slice: &[u8] = &data;
         let mut deposit = BidderDeposit::try_deserialize(&mut slice)
-            .map_err(|_| error!(OutcryError::InvalidAuctionStatus))?;
+            .map_err(|_| error!(OutcryError::InvalidDepositAccount))?;
         deposit.amount = 0;
         let mut writer: &mut [u8] = &mut data[..];
         deposit.try_serialize(&mut writer)?;

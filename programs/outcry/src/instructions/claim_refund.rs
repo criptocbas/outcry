@@ -24,6 +24,7 @@ pub struct ClaimRefund<'info> {
         seeds = [DEPOSIT_SEED, auction_state.key().as_ref(), bidder.key().as_ref()],
         bump = bidder_deposit.bump,
         constraint = bidder_deposit.amount > 0 @ OutcryError::NothingToRefund,
+        close = bidder,
     )]
     pub bidder_deposit: Account<'info, BidderDeposit>,
 

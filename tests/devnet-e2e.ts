@@ -717,10 +717,10 @@ describe("outcry devnet e2e", function () {
     expect(refund).to.be.greaterThan(0.04 * LAMPORTS_PER_SOL);
     console.log(`    Refund received ✓`);
 
-    // Deposit should be zeroed
-    const deposit = await program.account.bidderDeposit.fetch(bidderDepositPda);
-    expect(deposit.amount.toNumber()).to.equal(0);
-    console.log(`    Deposit after refund: 0 SOL ✓`);
+    // Deposit PDA should be closed (rent returned to bidder)
+    const depositAccount = await connection.getAccountInfo(bidderDepositPda);
+    expect(depositAccount).to.be.null;
+    console.log(`    Deposit PDA closed ✓`);
   });
 
   // -----------------------------------------------------------------------

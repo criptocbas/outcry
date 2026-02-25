@@ -2175,43 +2175,53 @@
     },
     {
       "code": 6016,
-      "name": "AuctionFull",
-      "msg": "Maximum number of bidders reached"
-    },
-    {
-      "code": 6017,
       "name": "OutstandingDeposits",
       "msg": "Cannot close auction with outstanding deposits — all bidders must claim refunds first"
     },
     {
-      "code": 6018,
+      "code": 6017,
       "name": "EscrowNotEmpty",
       "msg": "Cannot close auction while escrow still holds tokens"
     },
     {
-      "code": 6019,
+      "code": 6018,
       "name": "InvalidNftMint",
       "msg": "NFT mint must have 0 decimals"
     },
     {
-      "code": 6020,
+      "code": 6019,
       "name": "InvalidMetadata",
       "msg": "Could not parse Metaplex metadata account"
     },
     {
-      "code": 6021,
+      "code": 6020,
       "name": "MissingCreatorAccount",
       "msg": "Missing creator account in remaining_accounts for royalty distribution"
     },
     {
-      "code": 6022,
+      "code": 6021,
       "name": "ForfeitNotNeeded",
       "msg": "Forfeit not needed — winner has sufficient deposit for the winning bid"
     },
     {
-      "code": 6023,
+      "code": 6022,
       "name": "InvalidTreasury",
       "msg": "Invalid protocol treasury account"
+    },
+    {
+      "code": 6023,
+      "name": "NoBidsToSettle",
+      "msg": "Auction has no bids to settle"
+    },
+    {
+      "code": 6024,
+      "name": "InvalidBidIncrement",
+      "msg": "Minimum bid increment must be greater than zero"
+    },
+    {
+      "code": 6025,
+      "name": "InvalidDepositAccount",
+      "msg": "Could not deserialize deposit account data"
     }
   ],
   "types": [
