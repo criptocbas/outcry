@@ -19,9 +19,7 @@ import {
   Keypair,
   PublicKey,
   SystemProgram,
-  TransactionInstruction,
   LAMPORTS_PER_SOL,
-  SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
@@ -36,20 +34,20 @@ import { expect } from "chai";
 import fs from "fs";
 import path from "path";
 
+import {
+  PROTOCOL_TREASURY,
+  getMetadataPDA,
+  getDepositPDA,
+  createMetadataV3Instruction,
+  sleep,
+} from "./helpers";
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const PROGRAM_ID = new PublicKey(
   "J7r5mzvVUjSNQteoqn6Hd3LjZ3ksmwoD5xsnUvMJwPZo"
-);
-
-const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
-  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-);
-
-const PROTOCOL_TREASURY = new PublicKey(
-  "B6MtVeqn7BrJ8HTX6CeP8VugNWyCqqbfcDMxYBknzPt7"
 );
 
 // Use Helius for reliability, fall back to public devnet
@@ -76,125 +74,7 @@ function lamportsToSol(lamports: number | bigint): string {
   return (Number(lamports) / LAMPORTS_PER_SOL).toFixed(6);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function getMetadataPDA(nftMint: PublicKey): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("metadata"),
-      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
-      nftMint.toBuffer(),
-    ],
-    TOKEN_METADATA_PROGRAM_ID
-  );
-}
-
-function getDepositPDA(
-  auctionState: PublicKey,
-  bidder: PublicKey
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("deposit"), auctionState.toBuffer(), bidder.toBuffer()],
-    PROGRAM_ID
-  );
-}
-
-/**
- * Build a CreateMetadataAccountV3 instruction for the Token Metadata program.
- * Constructs the Borsh-serialized instruction data manually to avoid adding
- * @metaplex-foundation/mpl-token-metadata as a dependency.
- */
-function createMetadataV3Instruction(
-  metadataPda: PublicKey,
-  mint: PublicKey,
-  mintAuthority: PublicKey,
-  payer: PublicKey,
-  updateAuthority: PublicKey,
-  name: string,
-  symbol: string,
-  uri: string,
-  sellerFeeBasisPoints: number,
-  creators: { address: PublicKey; verified: boolean; share: number }[]
-): TransactionInstruction {
-  // Borsh-encode the instruction data for CreateMetadataAccountV3
-  // Discriminator = 33
-  const nameBytes = Buffer.from(name, "utf-8");
-  const symbolBytes = Buffer.from(symbol, "utf-8");
-  const uriBytes = Buffer.from(uri, "utf-8");
-
-  const parts: Buffer[] = [];
-
-  // Discriminator
-  parts.push(Buffer.from([33]));
-
-  // DataV2.name (borsh string = 4-byte LE len + bytes)
-  const nameLenBuf = Buffer.alloc(4);
-  nameLenBuf.writeUInt32LE(nameBytes.length);
-  parts.push(nameLenBuf);
-  parts.push(nameBytes);
-
-  // DataV2.symbol
-  const symbolLenBuf = Buffer.alloc(4);
-  symbolLenBuf.writeUInt32LE(symbolBytes.length);
-  parts.push(symbolLenBuf);
-  parts.push(symbolBytes);
-
-  // DataV2.uri
-  const uriLenBuf = Buffer.alloc(4);
-  uriLenBuf.writeUInt32LE(uriBytes.length);
-  parts.push(uriLenBuf);
-  parts.push(uriBytes);
-
-  // DataV2.seller_fee_basis_points (u16 LE)
-  const feeBuf = Buffer.alloc(2);
-  feeBuf.writeUInt16LE(sellerFeeBasisPoints);
-  parts.push(feeBuf);
-
-  // DataV2.creators: Option<Vec<Creator>>
-  if (creators.length > 0) {
-    parts.push(Buffer.from([1])); // Some
-    const countBuf = Buffer.alloc(4);
-    countBuf.writeUInt32LE(creators.length);
-    parts.push(countBuf);
-    for (const c of creators) {
-      parts.push(c.address.toBuffer()); // 32 bytes
-      parts.push(Buffer.from([c.verified ? 1 : 0])); // 1 byte
-      parts.push(Buffer.from([c.share])); // 1 byte
-    }
-  } else {
-    parts.push(Buffer.from([0])); // None
-  }
-
-  // DataV2.collection: None
-  parts.push(Buffer.from([0]));
-
-  // DataV2.uses: None
-  parts.push(Buffer.from([0]));
-
-  // is_mutable: true
-  parts.push(Buffer.from([1]));
-
-  // collection_details: None
-  parts.push(Buffer.from([0]));
-
-  const data = Buffer.concat(parts);
-
-  return new TransactionInstruction({
-    programId: TOKEN_METADATA_PROGRAM_ID,
-    keys: [
-      { pubkey: metadataPda, isSigner: false, isWritable: true },
-      { pubkey: mint, isSigner: false, isWritable: false },
-      { pubkey: mintAuthority, isSigner: true, isWritable: false },
-      { pubkey: payer, isSigner: true, isWritable: true },
-      { pubkey: updateAuthority, isSigner: false, isWritable: false },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-    ],
-    data,
-  });
-}
+// sleep, getMetadataPDA, getDepositPDA, createMetadataV3Instruction imported from ./helpers
 
 async function fundFromWallet(
   connection: Connection,
@@ -365,7 +245,7 @@ describe("outcry devnet e2e", function () {
     );
     console.log(`    Escrow ATA: ${escrowNftAta.toBase58()}`);
 
-    [bidderDepositPda] = getDepositPDA(auctionState, bidder.publicKey);
+    [bidderDepositPda] = getDepositPDA(auctionState, bidder.publicKey, PROGRAM_ID);
     console.log(`    BidderDeposit PDA: ${bidderDepositPda.toBase58()}`);
     console.log("");
   });
@@ -603,7 +483,7 @@ describe("outcry devnet e2e", function () {
     console.log(`    NFT Metadata PDA: ${nftMetadata.toBase58()}`);
 
     // Winner's BidderDeposit PDA
-    const [winnerDepositPda] = getDepositPDA(auctionState, bidder.publicKey);
+    const [winnerDepositPda] = getDepositPDA(auctionState, bidder.publicKey, PROGRAM_ID);
     console.log(`    Winner Deposit PDA: ${winnerDepositPda.toBase58()}`);
 
     // Pass creator accounts via remainingAccounts (seller is the sole creator)

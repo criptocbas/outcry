@@ -25,9 +25,7 @@ import {
   PublicKey,
   SystemProgram,
   Transaction,
-  TransactionInstruction,
   LAMPORTS_PER_SOL,
-  SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
@@ -51,13 +49,13 @@ const PROGRAM_ID = new PublicKey(
   "J7r5mzvVUjSNQteoqn6Hd3LjZ3ksmwoD5xsnUvMJwPZo"
 );
 
-const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
-  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-);
-
-const PROTOCOL_TREASURY = new PublicKey(
-  "B6MtVeqn7BrJ8HTX6CeP8VugNWyCqqbfcDMxYBknzPt7"
-);
+import {
+  PROTOCOL_TREASURY,
+  getMetadataPDA,
+  getDepositPDA as getDepositPDAHelper,
+  createMetadataV3Instruction,
+  sleep,
+} from "./helpers";
 
 const DELEGATION_PROGRAM_ID = new PublicKey(
   "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
@@ -98,29 +96,13 @@ function lamportsToSol(lamports: number | bigint): string {
   return (Number(lamports) / LAMPORTS_PER_SOL).toFixed(6);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function getMetadataPDA(nftMint: PublicKey): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("metadata"),
-      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
-      nftMint.toBuffer(),
-    ],
-    TOKEN_METADATA_PROGRAM_ID
-  );
-}
+// sleep, getMetadataPDA, createMetadataV3Instruction imported from ./helpers
 
 function getDepositPDA(
   auctionState: PublicKey,
   bidder: PublicKey
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("deposit"), auctionState.toBuffer(), bidder.toBuffer()],
-    PROGRAM_ID
-  );
+  return getDepositPDAHelper(auctionState, bidder, PROGRAM_ID);
 }
 
 // Delegation-related PDAs
@@ -221,82 +203,7 @@ async function sendErTransaction(
   return sig;
 }
 
-/**
- * Build a CreateMetadataAccountV3 instruction manually.
- */
-function createMetadataV3Instruction(
-  metadataPda: PublicKey,
-  mint: PublicKey,
-  mintAuthority: PublicKey,
-  payer: PublicKey,
-  updateAuthority: PublicKey,
-  name: string,
-  symbol: string,
-  uri: string,
-  sellerFeeBasisPoints: number,
-  creators: { address: PublicKey; verified: boolean; share: number }[]
-): TransactionInstruction {
-  const nameBytes = Buffer.from(name, "utf-8");
-  const symbolBytes = Buffer.from(symbol, "utf-8");
-  const uriBytes = Buffer.from(uri, "utf-8");
-  const parts: Buffer[] = [];
-
-  parts.push(Buffer.from([33])); // CreateMetadataAccountV3 discriminator
-
-  // name
-  const nameLenBuf = Buffer.alloc(4);
-  nameLenBuf.writeUInt32LE(nameBytes.length);
-  parts.push(nameLenBuf, nameBytes);
-
-  // symbol
-  const symbolLenBuf = Buffer.alloc(4);
-  symbolLenBuf.writeUInt32LE(symbolBytes.length);
-  parts.push(symbolLenBuf, symbolBytes);
-
-  // uri
-  const uriLenBuf = Buffer.alloc(4);
-  uriLenBuf.writeUInt32LE(uriBytes.length);
-  parts.push(uriLenBuf, uriBytes);
-
-  // seller_fee_basis_points
-  const feeBuf = Buffer.alloc(2);
-  feeBuf.writeUInt16LE(sellerFeeBasisPoints);
-  parts.push(feeBuf);
-
-  // creators: Option<Vec<Creator>>
-  if (creators.length > 0) {
-    parts.push(Buffer.from([1])); // Some
-    const countBuf = Buffer.alloc(4);
-    countBuf.writeUInt32LE(creators.length);
-    parts.push(countBuf);
-    for (const c of creators) {
-      parts.push(c.address.toBuffer());
-      parts.push(Buffer.from([c.verified ? 1 : 0]));
-      parts.push(Buffer.from([c.share]));
-    }
-  } else {
-    parts.push(Buffer.from([0]));
-  }
-
-  parts.push(Buffer.from([0])); // collection: None
-  parts.push(Buffer.from([0])); // uses: None
-  parts.push(Buffer.from([1])); // is_mutable: true
-  parts.push(Buffer.from([0])); // collection_details: None
-
-  return new TransactionInstruction({
-    programId: TOKEN_METADATA_PROGRAM_ID,
-    keys: [
-      { pubkey: metadataPda, isSigner: false, isWritable: true },
-      { pubkey: mint, isSigner: false, isWritable: false },
-      { pubkey: mintAuthority, isSigner: true, isWritable: false },
-      { pubkey: payer, isSigner: true, isWritable: true },
-      { pubkey: updateAuthority, isSigner: false, isWritable: false },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-    ],
-    data: Buffer.concat(parts),
-  });
-}
+// createMetadataV3Instruction imported from ./helpers
 
 async function fundFromWallet(
   connection: Connection,
