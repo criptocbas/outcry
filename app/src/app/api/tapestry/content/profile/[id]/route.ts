@@ -15,8 +15,8 @@ export async function GET(
   }
 
   const { id } = await params;
-  const limit = req.nextUrl.searchParams.get("limit") || "20";
-  const offset = req.nextUrl.searchParams.get("offset") || "0";
+  const limit = String(Math.min(100, Math.max(1, parseInt(req.nextUrl.searchParams.get("limit") || "20", 10) || 20)));
+  const offset = String(Math.min(10000, Math.max(0, parseInt(req.nextUrl.searchParams.get("offset") || "0", 10) || 0)));
 
   try {
     const res = await fetch(
