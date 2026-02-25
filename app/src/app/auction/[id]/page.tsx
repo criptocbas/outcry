@@ -42,6 +42,10 @@ function extractErrorMessage(err: unknown, fallback: string): string {
     if (msg.includes("User rejected") || msg.includes("rejected the request")) {
       return "Transaction rejected";
     }
+    // Wallet disconnected
+    if (msg.includes("Wallet not connected") || msg.includes("WalletNotConnectedError")) {
+      return "Wallet disconnected — please reconnect";
+    }
     // Anchor program errors — extract the readable part
     if (msg.includes("custom program error")) {
       const anchorMsg = msg.match(/Error Message: (.+?)\.?$/m)?.[1];
@@ -677,7 +681,7 @@ export default function AuctionRoomPage({
   return (
     <div className="relative min-h-screen">
       {/* Toast container */}
-      <div className="fixed right-6 bottom-6 z-50 flex flex-col gap-2">
+      <div className="fixed right-6 bottom-20 z-50 flex flex-col gap-2 sm:bottom-6">
         <AnimatePresence>
           {toasts.map((t) => (
             <ToastNotification key={t.id} toast={t} onDismiss={dismissToast} />
