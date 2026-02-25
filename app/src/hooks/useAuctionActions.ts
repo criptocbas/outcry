@@ -62,6 +62,9 @@ export interface UseAuctionActionsReturn {
   /** Claim a refund of deposited SOL (losers, after settlement/cancellation). */
   claimRefund: (auctionStatePubkey: PublicKey) => Promise<string>;
 
+  /** Permissionless refund — anyone can trigger a refund that sends SOL back to the bidder. */
+  claimRefundFor: (auctionStatePubkey: PublicKey, bidderAddress: PublicKey) => Promise<string>;
+
   /** Forfeit a defaulted auction — winner didn't deposit enough. Returns NFT to seller. */
   forfeitAuction: (
     auctionStatePubkey: PublicKey,
@@ -704,6 +707,35 @@ export function useAuctionActions(): UseAuctionActionsReturn {
   );
 
   // -----------------------------------------------------------------------
+  // claimRefundFor (L1 — permissionless refund on behalf of a bidder)
+  // -----------------------------------------------------------------------
+  const claimRefundFor = useCallback(
+    async (auctionStatePubkey: PublicKey, bidderAddress: PublicKey): Promise<string> => {
+      if (!l1Program || !publicKey) {
+        throw new Error("Wallet not connected");
+      }
+
+      const [auctionVault] = getVaultPDA(auctionStatePubkey);
+      const [bidderDeposit] = getDepositPDA(auctionStatePubkey, bidderAddress);
+
+      const sig = await l1Program.methods
+        .claimRefundFor()
+        .accounts({
+          payer: publicKey,
+          bidder: bidderAddress,
+          auctionState: auctionStatePubkey,
+          bidderDeposit,
+          auctionVault,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc({ skipPreflight: true });
+
+      return sig;
+    },
+    [l1Program, publicKey]
+  );
+
+  // -----------------------------------------------------------------------
   // forfeitAuction (L1 — handles defaulted winner)
   // -----------------------------------------------------------------------
   const forfeitAuction = useCallback(
@@ -834,6 +866,7 @@ export function useAuctionActions(): UseAuctionActionsReturn {
     undelegateAuction,
     settleAuction,
     claimRefund,
+    claimRefundFor,
     forfeitAuction,
     cancelAuction,
     closeAuction,

@@ -7,6 +7,7 @@ pub mod end_auction;
 pub mod undelegate_auction;
 pub mod settle_auction;
 pub mod claim_refund;
+pub mod claim_refund_for;
 pub mod cancel_auction;
 pub mod close_auction;
 pub mod forfeit_auction;
@@ -30,6 +31,8 @@ pub use undelegate_auction::*;
 pub use settle_auction::*;
 #[allow(ambiguous_glob_reexports)]
 pub use claim_refund::*;
+#[allow(ambiguous_glob_reexports)]
+pub use claim_refund_for::*;
 #[allow(ambiguous_glob_reexports)]
 pub use cancel_auction::*;
 #[allow(ambiguous_glob_reexports)]

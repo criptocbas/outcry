@@ -21,7 +21,7 @@ import Spinner from "@/components/ui/Spinner";
 import { useTapestryProfile } from "@/hooks/useTapestryProfile";
 import { useNftMetadata } from "@/hooks/useNftMetadata";
 import { getProfile, createContent } from "@/lib/tapestry";
-import { getAuctionBidders } from "@/lib/program";
+import { getAuctionBidders, getDepositPDA } from "@/lib/program";
 import { DELEGATION_PROGRAM_ID, DEVNET_RPC, MAGIC_ROUTER_RPC } from "@/lib/constants";
 import NftImage from "@/components/auction/NftImage";
 
@@ -302,7 +302,7 @@ export default function AuctionRoomPage({
   }, [isActive, isDelegated]);
 
   // Fetch user's BidderDeposit PDA (lives on L1, works even when auction is delegated)
-  const { deposit: bidderDepositAccount, refetch: refetchDeposit } = useBidderDeposit(
+  const { deposit: bidderDepositAccount, wasRefunded, refetch: refetchDeposit } = useBidderDeposit(
     id,
     publicKey?.toBase58() ?? null
   );
@@ -602,11 +602,77 @@ export default function AuctionRoomPage({
       await refetch();
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "Close failed");
-      addToast(msg, "error");
+      if (msg.includes("OutstandingDeposits") || msg.includes("outstanding")) {
+        addToast("Cannot close — bidders still have unclaimed deposits. Use 'Refund All Bidders' first.", "error");
+      } else {
+        addToast(msg, "error");
+      }
     } finally {
       setActionLoading(false);
     }
   }, [auction, actions, id, addToast, refetch, publicKey]);
+
+  // -------------------------------------------------------------------------
+  // Refund all bidders (seller triggers permissionless refunds)
+  // -------------------------------------------------------------------------
+  const [refundProgress, setRefundProgress] = useState<string | null>(null);
+  const handleRefundAll = useCallback(async () => {
+    if (!auction || !publicKey) return;
+    setActionLoading(true);
+    setRefundProgress(null);
+    try {
+      const auctionPubkey = new PublicKey(id);
+      const bidders = await getAuctionBidders(l1Connection, auctionPubkey);
+
+      // Skip the winner (their deposit was used at settlement) and filter to existing accounts
+      const winnerKey = auction.highestBidder?.toBase58();
+      const activeBidders: PublicKey[] = [];
+      for (const bidder of bidders) {
+        if (bidder.toBase58() === winnerKey) continue;
+        const [depositPDA] = getDepositPDA(auctionPubkey, bidder);
+        const info = await l1Connection.getAccountInfo(depositPDA);
+        if (info) activeBidders.push(bidder);
+      }
+
+      if (activeBidders.length === 0) {
+        addToast("No outstanding deposits to refund", "success");
+        return;
+      }
+
+      let refunded = 0;
+      for (const bidder of activeBidders) {
+        setRefundProgress(`Refunding ${refunded + 1}/${activeBidders.length}...`);
+        try {
+          const sig = await actions.claimRefundFor(auctionPubkey, bidder);
+          refunded++;
+          addToast(
+            `Refunded ${truncateAddress(bidder.toBase58())}`,
+            "success",
+            explorerUrl(sig)
+          );
+        } catch (err: unknown) {
+          const msg = extractErrorMessage(err, "Refund failed");
+          // Skip NothingToRefund errors (already zeroed)
+          if (!msg.includes("NothingToRefund")) {
+            addToast(`Failed to refund ${truncateAddress(bidder.toBase58())}: ${msg}`, "error");
+          }
+        }
+        // Small delay to avoid rate limits
+        if (refunded < activeBidders.length) {
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+
+      addToast(`All refunds complete (${refunded}/${activeBidders.length})`, "success");
+      await refetch();
+    } catch (err: unknown) {
+      const msg = extractErrorMessage(err, "Refund all failed");
+      addToast(msg, "error");
+    } finally {
+      setActionLoading(false);
+      setRefundProgress(null);
+    }
+  }, [auction, actions, id, addToast, refetch, publicKey, l1Connection]);
 
   // ---------------------------------------------------------------------------
   // Loading state
@@ -1079,6 +1145,13 @@ export default function AuctionRoomPage({
                 </button>
               )}
 
+              {/* Refund already claimed/processed — informational banner for non-seller bidders */}
+              {(isSettled || isCancelled) && !isSeller && !isWinner && wasRefunded && userDeposit == null && (
+                <div className="rounded-md border border-green-500/20 bg-green-500/5 px-4 py-3 text-center text-sm text-green-400">
+                  Your deposit has been refunded to your wallet.
+                </div>
+              )}
+
               {/* Cancel auction — seller only, Created status */}
               {isCreated && isSeller && (
                 <button
@@ -1090,15 +1163,28 @@ export default function AuctionRoomPage({
                 </button>
               )}
 
-              {/* Close auction — seller only, Settled/Cancelled status, reclaim rent */}
+              {/* Post-settlement seller actions — refund then close */}
               {(isSettled || isCancelled) && isSeller && (
-                <button
-                  onClick={handleClose}
-                  disabled={actionLoading}
-                  className="flex h-10 w-full items-center justify-center rounded-md border border-cream/15 text-xs font-medium tracking-[0.1em] text-cream/40 uppercase transition-all hover:border-cream/30 hover:text-cream/60 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {actionLoading ? <Spinner /> : "Close Auction & Reclaim Rent"}
-                </button>
+                <div className="space-y-3 rounded-lg border border-charcoal-light bg-charcoal/50 p-4">
+                  <p className="text-xs leading-relaxed text-cream/50">
+                    <span className="font-semibold text-cream/70">Step 1:</span> Refund all losing bidders&apos; deposits.{" "}
+                    <span className="font-semibold text-cream/70">Step 2:</span> Close the auction to reclaim account rent.
+                  </p>
+                  <button
+                    onClick={handleRefundAll}
+                    disabled={actionLoading}
+                    className="flex h-11 w-full items-center justify-center rounded-md border border-gold/30 text-xs font-medium tracking-[0.1em] text-gold uppercase transition-all hover:border-gold hover:bg-gold/5 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {actionLoading && refundProgress ? refundProgress : actionLoading ? <Spinner /> : "Step 1 — Refund All Bidders"}
+                  </button>
+                  <button
+                    onClick={handleClose}
+                    disabled={actionLoading}
+                    className="flex h-10 w-full items-center justify-center rounded-md border border-cream/15 text-xs font-medium tracking-[0.1em] text-cream/40 uppercase transition-all hover:border-cream/30 hover:text-cream/60 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {actionLoading ? <Spinner /> : "Step 2 — Close Auction & Reclaim Rent"}
+                  </button>
+                </div>
               )}
             </div>
 

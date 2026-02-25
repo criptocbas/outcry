@@ -16,6 +16,8 @@ export interface BidderDepositAccount {
 
 export interface UseBidderDepositReturn {
   deposit: BidderDepositAccount | null;
+  /** True when the deposit PDA was closed (bidder was refunded or claimed). */
+  wasRefunded: boolean;
   loading: boolean;
   refetch: () => Promise<void>;
 }
@@ -32,11 +34,13 @@ export function useBidderDeposit(
   const wallet = useAnchorWallet();
 
   const [deposit, setDeposit] = useState<BidderDepositAccount | null>(null);
+  const [wasRefunded, setWasRefunded] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const fetchDeposit = useCallback(async () => {
     if (!auctionPublicKey || !bidderPublicKey) {
       setDeposit(null);
+      setWasRefunded(false);
       return;
     }
 
@@ -51,9 +55,19 @@ export function useBidderDeposit(
         program.account as Record<string, { fetch: (key: PublicKey) => Promise<unknown> }>
       )["bidderDeposit"].fetch(depositPda);
       setDeposit(account as unknown as BidderDepositAccount);
+      setWasRefunded(false);
     } catch {
-      // Account doesn't exist yet — no deposit made
+      // Account doesn't exist — check if it ever did (was refunded/claimed)
       setDeposit(null);
+      try {
+        const auctionPk = new PublicKey(auctionPublicKey);
+        const bidderPk = new PublicKey(bidderPublicKey);
+        const [depositPda] = getDepositPDA(auctionPk, bidderPk);
+        const sigs = await connection.getSignaturesForAddress(depositPda, { limit: 1 });
+        setWasRefunded(sigs.length > 0);
+      } catch {
+        setWasRefunded(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -65,6 +79,7 @@ export function useBidderDeposit(
     (async () => {
       if (!auctionPublicKey || !bidderPublicKey) {
         setDeposit(null);
+        setWasRefunded(false);
         return;
       }
 
@@ -78,9 +93,23 @@ export function useBidderDeposit(
         const account = await (
           program.account as Record<string, { fetch: (key: PublicKey) => Promise<unknown> }>
         )["bidderDeposit"].fetch(depositPda);
-        if (!stale) setDeposit(account as unknown as BidderDepositAccount);
+        if (!stale) {
+          setDeposit(account as unknown as BidderDepositAccount);
+          setWasRefunded(false);
+        }
       } catch {
-        if (!stale) setDeposit(null);
+        if (!stale) {
+          setDeposit(null);
+          try {
+            const auctionPk = new PublicKey(auctionPublicKey);
+            const bidderPk = new PublicKey(bidderPublicKey);
+            const [depositPda] = getDepositPDA(auctionPk, bidderPk);
+            const sigs = await connection.getSignaturesForAddress(depositPda, { limit: 1 });
+            if (!stale) setWasRefunded(sigs.length > 0);
+          } catch {
+            if (!stale) setWasRefunded(false);
+          }
+        }
       } finally {
         if (!stale) setLoading(false);
       }
@@ -89,5 +118,5 @@ export function useBidderDeposit(
     return () => { stale = true; };
   }, [auctionPublicKey, bidderPublicKey, wallet, connection]);
 
-  return { deposit, loading, refetch: fetchDeposit };
+  return { deposit, wasRefunded, loading, refetch: fetchDeposit };
 }

@@ -36,6 +36,7 @@ Traditional onchain auctions suffer from ~400ms block times. OUTCRY uses **Magic
 - **Bid speed indicator** — every bid shows confirmation time (e.g. "confirmed in 42ms")
 - **Explorer links** — every transaction toast links directly to Solana Explorer
 - **ER fallback** — automatic L1 fallback when Magic Router is unavailable
+- **Permissionless refunds** — sellers can refund all bidders in one click, unblocking auction closure
 - **Force close** — sellers can recover stuck accounts after 7-day grace period
 - **Mobile-first responsive design** with dark theme and warm gold accents
 
@@ -61,6 +62,8 @@ Traditional onchain auctions suffer from ~400ms block times. OUTCRY uses **Magic
               │ delegate      │  │                     │
               │ settle_auction│  └─────────────────────┘
               │ claim_refund  │
+              │ claim_refund_ │
+              │  for          │
               │ cancel_auction│
               │ close_auction │
               │ forfeit       │
@@ -103,7 +106,10 @@ create_auction (L1)  ─── Artist escrows NFT, sets reserve price + duration
      │
      ├── settle_auction (L1)  ─── NFT → winner, SOL → seller (verifies deposit)
      │
-     └── claim_refund (L1)  ─── Losing bidders reclaim their deposits
+     ├── claim_refund (L1)  ─── Losing bidders reclaim their deposits
+     │     └── (or claim_refund_for — anyone can trigger refund to a bidder)
+     │
+     └── close_auction (L1)  ─── Close accounts, reclaim rent
 ```
 
 ### Status Flow
@@ -143,6 +149,7 @@ Created ──→ Active ──→ Ended ──→ Settled
 | `undelegate_auction` | ER→L1 | Commit final state back to L1 |
 | `settle_auction` | L1 | Transfer NFT to winner, distribute SOL to seller. Verifies winner's deposit >= bid |
 | `claim_refund` | L1 | Losing bidders reclaim their BidderDeposit |
+| `claim_refund_for` | L1 | Permissionless refund — anyone can trigger a refund to a specific bidder |
 | `cancel_auction` | L1 | Seller cancels (only if Created, no bids placed) |
 | `close_auction` | L1 | Close all accounts, reclaim rent (only after all refunds claimed) |
 | `forfeit_auction` | L1 | Handle winner default — slash deposit, return NFT to seller |
@@ -157,6 +164,7 @@ Created ──→ Active ──→ Ended ──→ Settled
 - **NFT mint validation:** Settlement and forfeit verify the correct NFT is being transferred
 - **Overflow protection:** All arithmetic uses checked operations
 - **ER fallback:** Transparent L1 fallback when Magic Router is unavailable
+- **Permissionless refunds:** Sellers (or anyone) can trigger refunds for bidders via `claim_refund_for`, unblocking auction closure without waiting for each bidder to claim individually
 - **Force close:** 7-day grace period prevents permanent account lockup from unclaimed deposits
 
 See [SECURITY.md](SECURITY.md) for the full threat model and access control matrix.
@@ -470,7 +478,7 @@ Here's the full end-to-end flow on devnet:
 5. **Place bids** — Bid in real-time — each bid confirms in under 50ms with a speed indicator
 6. **Anti-snipe** — Bid in the last 5 minutes to see the timer extend
 7. **Settle** — After the timer expires, click "Settle" to transfer the NFT and distribute SOL
-8. **Claim refund** — Losing bidders click "Claim Refund" to get their deposits back
+8. **Claim refund** — Losing bidders click "Claim Refund", or the seller clicks "Refund All Bidders" to return all deposits at once
 9. **Badges** — Winner receives a Victor badge, bidders receive Contender badges (visible on profile page)
 
 Every transaction shows an explorer link in the toast notification for on-chain verification.

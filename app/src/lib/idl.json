@@ -326,6 +326,98 @@
       "args": []
     },
     {
+      "name": "claim_refund_for",
+      "docs": [
+        "Permissionless refund — anyone (typically the seller) can trigger a",
+        "refund that sends SOL back to the bidder. Bidder is validated via PDA seeds."
+      ],
+      "discriminator": [
+        191,
+        214,
+        249,
+        165,
+        145,
+        156,
+        53,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Anyone can pay the transaction fee (typically the seller)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bidder",
+          "docs": [
+            "implicitly via the BidderDeposit PDA seed derivation below."
+          ],
+          "writable": true
+        },
+        {
+          "name": "auction_state"
+        },
+        {
+          "name": "bidder_deposit",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "auction_state"
+              },
+              {
+                "kind": "account",
+                "path": "bidder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "auction_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "auction_state"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_auction",
       "docs": [
         "Closes AuctionState, AuctionVault, and escrow ATA after all refunds are claimed.",

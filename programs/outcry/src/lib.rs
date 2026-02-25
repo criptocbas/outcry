@@ -71,6 +71,12 @@ pub mod outcry {
         instructions::claim_refund::handle_claim_refund(ctx)
     }
 
+    /// Permissionless refund — anyone (typically the seller) can trigger a
+    /// refund that sends SOL back to the bidder. Bidder is validated via PDA seeds.
+    pub fn claim_refund_for(ctx: Context<ClaimRefundFor>) -> Result<()> {
+        instructions::claim_refund_for::handle_claim_refund_for(ctx)
+    }
+
     pub fn cancel_auction(ctx: Context<CancelAuction>) -> Result<()> {
         instructions::cancel_auction::handle_cancel_auction(ctx)
     }
