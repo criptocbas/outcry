@@ -22,7 +22,7 @@ import { useTapestryProfile } from "@/hooks/useTapestryProfile";
 import { useNftMetadata } from "@/hooks/useNftMetadata";
 import { getProfile, createContent } from "@/lib/tapestry";
 import { getAuctionBidders } from "@/lib/program";
-import { DELEGATION_PROGRAM_ID, DEVNET_RPC } from "@/lib/constants";
+import { DELEGATION_PROGRAM_ID, DEVNET_RPC, MAGIC_ROUTER_RPC } from "@/lib/constants";
 import NftImage from "@/components/auction/NftImage";
 
 // ---------------------------------------------------------------------------
@@ -269,6 +269,33 @@ export default function AuctionRoomPage({
     auction && publicKey && auction.highestBidder
       ? auction.highestBidder.toBase58() === publicKey.toBase58()
       : false;
+
+  // ER health check — ping Magic Router when auction is active + delegated
+  const [erHealthy, setErHealthy] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!isActive || !isDelegated) {
+      setErHealthy(null);
+      return;
+    }
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await fetch(MAGIC_ROUTER_RPC, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getHealth" }),
+        });
+        const json = await res.json();
+        if (!cancelled) setErHealthy(json?.result === "ok");
+      } catch {
+        if (!cancelled) setErHealthy(false);
+      }
+    };
+    check();
+    const interval = setInterval(check, 30_000); // re-check every 30s
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [isActive, isDelegated]);
 
   // Fetch user's BidderDeposit PDA (lives on L1, works even when auction is delegated)
   const { deposit: bidderDepositAccount, refetch: refetchDeposit } = useBidderDeposit(
@@ -776,6 +803,14 @@ export default function AuctionRoomPage({
                 </span>
               )}
             </div>
+
+            {/* ER health warning */}
+            {erHealthy === false && (
+              <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-300">
+                <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                Ephemeral Rollup unavailable — bids will confirm at L1 speed (~400ms)
+              </div>
+            )}
 
             {/* Countdown timer */}
             <div className="flex justify-center rounded-lg border border-charcoal-light bg-charcoal px-6 py-6">

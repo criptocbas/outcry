@@ -194,30 +194,43 @@ async function sendErTransaction(
   const tx = await txBuilder.transaction();
   tx.feePayer = feePayer;
 
-  const { blockhash, lastValidBlockHeight } = await getMagicBlockhash(
-    connection.rpcEndpoint,
-    tx
-  );
+  let blockhash: string;
+  let lastValidBlockHeight: number;
+  let sendConnection = connection;
+
+  try {
+    const result = await getMagicBlockhash(connection.rpcEndpoint, tx);
+    blockhash = result.blockhash;
+    lastValidBlockHeight = result.lastValidBlockHeight;
+  } catch (err) {
+    // ER unavailable — fall back to L1 blockhash. placeBid is a standard
+    // Anchor instruction that works on both L1 and ER, so this is safe.
+    debugLog("[sendErTransaction] ER unavailable, falling back to L1:", err);
+    const l1Conn = new Connection(DEVNET_RPC, "confirmed");
+    const result = await l1Conn.getLatestBlockhash("confirmed");
+    blockhash = result.blockhash;
+    lastValidBlockHeight = result.lastValidBlockHeight;
+    sendConnection = l1Conn;
+  }
+
   tx.recentBlockhash = blockhash;
   tx.lastValidBlockHeight = lastValidBlockHeight;
 
   const signed = await walletAdapter.signTransaction(tx);
-  const sig = await connection.sendRawTransaction(signed.serialize(), {
+  const sig = await sendConnection.sendRawTransaction(signed.serialize(), {
     skipPreflight: true,
   });
 
-  // Wait for ER to confirm the transaction (matches the test pattern).
-  // Without this, sequential ER operations (end → undelegate) can race
-  // against each other because the previous tx hasn't landed yet.
+  // Wait for confirmation (matches the test pattern). Without this,
+  // sequential ER operations (end → undelegate) can race.
   try {
-    await connection.confirmTransaction(
+    await sendConnection.confirmTransaction(
       { signature: sig, blockhash, lastValidBlockHeight },
       "confirmed"
     );
   } catch (confirmErr) {
     // Log but don't throw — the tx may have landed even if confirmation
-    // times out (e.g. WebSocket flakiness). Callers that depend on state
-    // changes should verify on-chain state before proceeding.
+    // times out (e.g. WebSocket flakiness).
     debugLog("[sendErTransaction] confirmation warning:", confirmErr);
   }
 
