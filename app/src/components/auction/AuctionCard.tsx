@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import AuctionStatus from "./AuctionStatus";
 import NftImage from "./NftImage";
-import { formatTimeRemaining } from "@/lib/utils";
+import { formatTimeRemaining, formatSOL } from "@/lib/utils";
 
 interface AuctionStatus_t {
   created?: Record<string, never>;
@@ -36,10 +36,6 @@ function getStatusKey(status: AuctionStatus_t): string {
   if (status.settled !== undefined) return "settled";
   if (status.cancelled !== undefined) return "cancelled";
   return "created";
-}
-
-function formatSol(lamports: number): string {
-  return (lamports / 1_000_000_000).toFixed(2);
 }
 
 export default function AuctionCard({ auction }: AuctionCardProps) {
@@ -88,7 +84,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {formatSol(displayBid)}
+                  {formatSOL(displayBid)}
                 </span>
                 <span
                   className="text-[10px] font-medium text-[#C6A961]/50 uppercase"

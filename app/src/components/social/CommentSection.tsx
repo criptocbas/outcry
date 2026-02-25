@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuctionComments } from "@/hooks/useAuctionComments";
 import { useTapestryProfile } from "@/hooks/useTapestryProfile";
+import Spinner from "@/components/ui/Spinner";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -188,7 +189,7 @@ export default function CommentSection({ auctionId, headerRight }: CommentSectio
               className="flex h-9 items-center justify-center rounded-md bg-gold px-4 text-[11px] font-semibold tracking-[0.1em] text-jet uppercase transition-all duration-200 hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-40"
               style={{ fontFamily: "var(--font-sans)" }}
             >
-              {posting ? <SmallSpinner /> : "Post"}
+              {posting ? <Spinner className="h-4 w-4" /> : "Post"}
             </button>
           </form>
         ) : (
@@ -239,27 +240,3 @@ function AuthorAvatar({
   );
 }
 
-function SmallSpinner() {
-  return (
-    <svg
-      className="h-4 w-4 animate-spin text-jet"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="3"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-      />
-    </svg>
-  );
-}

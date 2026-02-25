@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { formatSOL } from "@/lib/utils";
+import Spinner from "@/components/ui/Spinner";
 
 const MIN_BID_INCREMENT_LAMPORTS = 100_000_000; // 0.1 SOL
 
@@ -25,10 +27,6 @@ interface BidPanelProps {
   progressLabel?: string | null;
   /** When true, shows "Deposit" instead of "Place Bid" and relaxes min bid validation */
   depositOnly?: boolean;
-}
-
-function formatSol(lamports: number): string {
-  return (lamports / 1_000_000_000).toFixed(2);
 }
 
 function parseSolToLamports(sol: string): number {
@@ -56,14 +54,14 @@ export default function BidPanel({
     return auctionState.reservePrice;
   }, [auctionState.currentBid, auctionState.reservePrice]);
 
-  const [bidInput, setBidInput] = useState<string>(formatSol(minBid));
+  const [bidInput, setBidInput] = useState<string>(formatSOL(minBid));
   const [userEdited, setUserEdited] = useState(false);
 
   // Update suggested bid when minBid changes (e.g. someone else bids),
   // but only if user hasn't manually typed a custom amount
   useEffect(() => {
     if (!userEdited) {
-      setBidInput(formatSol(minBid));
+      setBidInput(formatSOL(minBid));
     }
   }, [minBid, userEdited]);
 
@@ -81,12 +79,12 @@ export default function BidPanel({
   // Quick bid buttons: min bid, +0.1, +0.5
   const quickBids = useMemo(() => {
     const bids = [
-      { label: `${formatSol(minBid)}`, value: minBid },
+      { label: `${formatSOL(minBid)}`, value: minBid },
     ];
     const plus01 = minBid + 100_000_000;
     const plus05 = minBid + 500_000_000;
-    bids.push({ label: `${formatSol(plus01)}`, value: plus01 });
-    bids.push({ label: `${formatSol(plus05)}`, value: plus05 });
+    bids.push({ label: `${formatSOL(plus01)}`, value: plus01 });
+    bids.push({ label: `${formatSOL(plus05)}`, value: plus05 });
     return bids;
   }, [minBid]);
 
@@ -108,7 +106,7 @@ export default function BidPanel({
             {quickBids.map((qb) => (
               <button
                 key={qb.value}
-                onClick={() => { setBidInput(formatSol(qb.value)); setUserEdited(false); }}
+                onClick={() => { setBidInput(formatSOL(qb.value)); setUserEdited(false); }}
                 className={`flex-1 rounded-md border py-2 text-xs font-medium tabular-nums transition-all ${
                   bidLamports === qb.value
                     ? "border-gold/50 bg-gold/10 text-gold"
@@ -139,16 +137,16 @@ export default function BidPanel({
           <div className="space-y-1">
             {depositOnly ? (
               <p className="text-center text-[11px] text-cream/30">
-                Reserve price: {formatSol(minBid)} SOL
+                Reserve price: {formatSOL(minBid)} SOL
               </p>
             ) : (
               <>
                 <p className="text-center text-[11px] text-cream/30">
-                  Minimum bid: {formatSol(minBid)} SOL
+                  Minimum bid: {formatSOL(minBid)} SOL
                 </p>
                 {!hasEnoughDeposit && bidLamports >= minBid && (
                   <p className="text-center text-[11px] text-gold/60">
-                    Will deposit {formatSol(depositNeeded)} SOL first, then place bid
+                    Will deposit {formatSOL(depositNeeded)} SOL first, then place bid
                   </p>
                 )}
               </>
@@ -180,36 +178,11 @@ export default function BidPanel({
           {/* Deposit balance */}
           {userDeposit !== null && userDeposit > 0 && (
             <p className="text-center text-[11px] text-cream/25">
-              Deposit balance: {formatSol(userDeposit)} SOL (refundable)
+              Deposit balance: {formatSOL(userDeposit)} SOL (refundable)
             </p>
           )}
         </>
       )}
     </div>
-  );
-}
-
-function Spinner() {
-  return (
-    <svg
-      className="h-5 w-5 animate-spin text-jet"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="3"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-      />
-    </svg>
   );
 }
