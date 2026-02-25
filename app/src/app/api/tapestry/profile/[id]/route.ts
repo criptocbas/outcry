@@ -17,13 +17,20 @@ export async function PUT(
   const { id } = await params;
   const body = await req.json();
 
+  // Whitelist allowed fields to prevent arbitrary data injection
+  const ALLOWED_FIELDS = ["username", "bio", "image"];
+  const sanitized: Record<string, unknown> = {};
+  for (const key of ALLOWED_FIELDS) {
+    if (key in body) sanitized[key] = body[key];
+  }
+
   try {
     const res = await fetch(
       `${TAPESTRY_BASE}/profiles/${encodeURIComponent(id)}?apiKey=${API_KEY}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(sanitized),
       }
     );
     const data = await res.json();

@@ -79,6 +79,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Validate badgeType values
+  const validBadgeTypes = new Set(["present", "contender", "victor"]);
+  const invalidType = body.recipients.find((r) => !validBadgeTypes.has(r.badgeType));
+  if (invalidType) {
+    return NextResponse.json(
+      { error: `Invalid badgeType: ${invalidType.badgeType}. Must be one of: present, contender, victor` },
+      { status: 400 }
+    );
+  }
+
   // All recipients must share the same auctionId
   const auctionId = body.recipients[0].auctionId;
   if (!auctionId || body.recipients.some((r) => r.auctionId !== auctionId)) {

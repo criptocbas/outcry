@@ -76,10 +76,14 @@ export function useFollowStatus(
     };
   }, [myId, targetId]);
 
+  // Rapid-click guard
+  const togglingRef = useRef(false);
+
   // Toggle follow / unfollow.
   const toggle = useCallback(async () => {
-    if (!myId || !targetId || myId === targetId) return;
+    if (!myId || !targetId || myId === targetId || togglingRef.current) return;
 
+    togglingRef.current = true;
     setLoading(true);
     try {
       if (isFollowing) {
@@ -93,6 +97,7 @@ export function useFollowStatus(
       // Revert on error is implicit -- we only set state on success.
     } finally {
       setLoading(false);
+      togglingRef.current = false;
     }
   }, [myId, targetId, isFollowing]);
 

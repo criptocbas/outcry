@@ -97,18 +97,23 @@ export function useAuctionLike(
 
     togglingRef.current = true;
     setLoading(true);
+
+    // Optimistic update
+    const prevLiked = hasLiked;
+    const prevCount = likeCount;
+    setHasLiked(!hasLiked);
+    setLikeCount(hasLiked ? Math.max(0, likeCount - 1) : likeCount + 1);
+
     try {
-      if (hasLiked) {
+      if (prevLiked) {
         await unlikeContent(userProfileId, auctionId);
-        setHasLiked(false);
-        setLikeCount((prev) => Math.max(0, prev - 1));
       } else {
         await likeContent(userProfileId, auctionId);
-        setHasLiked(true);
-        setLikeCount((prev) => prev + 1);
       }
     } catch {
-      // Silently ignore
+      // Rollback optimistic update on failure
+      setHasLiked(prevLiked);
+      setLikeCount(prevCount);
     } finally {
       setLoading(false);
       togglingRef.current = false;
