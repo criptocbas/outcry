@@ -20,8 +20,18 @@ export interface NftMetadata {
   uri: string;
 }
 
-// Module-level cache so we don't re-fetch across components/renders
+// Module-level cache so we don't re-fetch across components/renders.
+// Capped at 200 entries — evicts oldest when full.
+const MAX_CACHE = 200;
 const metadataCache = new Map<string, NftMetadata>();
+
+function cacheSet(key: string, value: NftMetadata) {
+  if (metadataCache.size >= MAX_CACHE) {
+    const oldest = metadataCache.keys().next().value;
+    if (oldest !== undefined) metadataCache.delete(oldest);
+  }
+  metadataCache.set(key, value);
+}
 
 /**
  * Derives the Metaplex Metadata PDA for a given mint.
@@ -165,7 +175,7 @@ export function useNftMetadata(mintAddress: string | null): {
           uri: parsed.uri,
         };
 
-        metadataCache.set(mintAddress, result);
+        cacheSet(mintAddress, result);
         setMetadata(result);
       } catch {
         // Metadata account doesn't exist or parse failed

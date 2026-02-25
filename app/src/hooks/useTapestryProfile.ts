@@ -19,7 +19,16 @@ export interface UseTapestryProfileReturn {
 // Keyed by wallet address, stores the resolved profile (or null if not found).
 // ---------------------------------------------------------------------------
 
+const MAX_CACHE = 200;
 const profileCache = new Map<string, ProfileWithCounts | null>();
+
+function cacheSet(key: string, value: ProfileWithCounts | null) {
+  if (profileCache.size >= MAX_CACHE) {
+    const oldest = profileCache.keys().next().value;
+    if (oldest !== undefined) profileCache.delete(oldest);
+  }
+  profileCache.set(key, value);
+}
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -53,7 +62,7 @@ export function useTapestryProfile(
       const result = await getProfile(address);
       // Only apply if this is still the active request.
       if (activeRequestRef.current === address) {
-        profileCache.set(address, result);
+        cacheSet(address, result);
         setProfile(result);
       }
     } catch (err: unknown) {
