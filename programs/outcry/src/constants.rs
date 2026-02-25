@@ -17,7 +17,7 @@ pub const TOKEN_METADATA_PROGRAM_ID: Pubkey = Pubkey::new_from_array([
     88, 184, 108, 115, 26, 160, 253, 181, 73, 182, 209, 188, 3, 248, 41, 70,
 ]);
 
-pub const MIN_AUCTION_DURATION: u64 = 5; // 5 seconds (short for testing; increase in production)
+pub const MIN_AUCTION_DURATION: u64 = 300; // 5 minutes
 pub const MAX_AUCTION_DURATION: u64 = 604_800; // 7 days
 
 pub const AUCTION_SEED: &[u8] = b"auction";

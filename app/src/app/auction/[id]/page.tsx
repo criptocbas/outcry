@@ -71,7 +71,11 @@ interface Toast {
   id: number;
   message: string;
   type: "success" | "error";
+  link?: string;
 }
+
+const explorerUrl = (sig: string) =>
+  `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
 
 function ToastNotification({
   toast,
@@ -98,7 +102,17 @@ function ToastNotification({
           : "border-red-500/30 bg-red-500/10 text-red-400"
       }`}
     >
-      {toast.message}
+      <span>{toast.message}</span>
+      {toast.link && (
+        <a
+          href={toast.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-2 underline decoration-current/40 underline-offset-2 hover:decoration-current/80"
+        >
+          View tx
+        </a>
+      )}
     </motion.div>
   );
 }
@@ -131,11 +145,11 @@ export default function AuctionRoomPage({
   const [bidHistory, setBidHistory] = useState<Array<{ bidder: string; amount: number; timestamp: number }>>([]);
 
   const addToast = useCallback(
-    (message: string, type: "success" | "error") => {
+    (message: string, type: "success" | "error", link?: string) => {
       setToasts((prev) => {
         // Deduplicate: skip if identical message already showing
         if (prev.some((t) => t.message === message)) return prev;
-        const newToast: Toast = { id: Date.now(), message, type };
+        const newToast: Toast = { id: Date.now(), message, type, link };
         // Limit to 3 concurrent toasts — drop oldest
         const updated = [...prev, newToast];
         return updated.length > 3 ? updated.slice(-3) : updated;
@@ -279,17 +293,23 @@ export default function AuctionRoomPage({
         // Step 1: Auto-deposit if needed
         if (depositNeeded > 0) {
           setProgressLabel("Depositing SOL...");
-          await actions.deposit(new PublicKey(id), new BN(depositNeeded));
-          addToast(`Deposited ${formatSOL(depositNeeded)} SOL`, "success");
+          const depSig = await actions.deposit(new PublicKey(id), new BN(depositNeeded));
+          addToast(`Deposited ${formatSOL(depositNeeded)} SOL`, "success", explorerUrl(depSig));
           // Brief pause for L1 confirmation
           await new Promise((r) => setTimeout(r, 1500));
           await refetchDeposit();
         }
 
-        // Step 2: Place bid
+        // Step 2: Place bid (with speed indicator)
         setProgressLabel("Placing bid...");
-        await actions.placeBid(new PublicKey(id), new BN(bidLamports));
-        addToast(`Bid placed: ${formatSOL(bidLamports)} SOL`, "success");
+        const t0 = performance.now();
+        const bidSig = await actions.placeBid(new PublicKey(id), new BN(bidLamports));
+        const elapsed = Math.round(performance.now() - t0);
+        addToast(
+          `Bid placed: ${formatSOL(bidLamports)} SOL \u2014 confirmed in ${elapsed}ms`,
+          "success",
+          explorerUrl(bidSig)
+        );
         await refetch();
       } catch (err: unknown) {
         const msg = extractErrorMessage(err, "Bid failed");
@@ -314,16 +334,20 @@ export default function AuctionRoomPage({
       // Step 1: Start auction (if still Created)
       if (isCreated) {
         setProgressLabel("Starting auction...");
-        await actions.startAuction(new PublicKey(id), auction.nftMint);
-        addToast("Auction started!", "success");
+        const startSig = await actions.startAuction(new PublicKey(id), auction.nftMint);
+        addToast("Auction started!", "success", explorerUrl(startSig));
         await new Promise((r) => setTimeout(r, 2000));
         await refetch();
       }
 
       // Step 2: Delegate to ER
       setProgressLabel("Delegating to Ephemeral Rollup...");
-      await actions.delegateAuction(new PublicKey(id), auction.nftMint);
-      addToast("Live on Ephemeral Rollup!", "success");
+      const delSig = await actions.delegateAuction(new PublicKey(id), auction.nftMint);
+      // Wait for the ER to sync the delegated account before allowing bids.
+      // Without this, immediate bids can fail with "account not found" on ER.
+      setProgressLabel("Syncing with Ephemeral Rollup...");
+      await new Promise((r) => setTimeout(r, 3000));
+      addToast("Live on Ephemeral Rollup!", "success", explorerUrl(delSig));
       await refetch();
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "Failed to go live");
@@ -347,8 +371,8 @@ export default function AuctionRoomPage({
       if (isActive && timerExpired) {
         setProgressLabel("Ending auction...");
         try {
-          await actions.endAuction(new PublicKey(id));
-          addToast("Auction ended", "success");
+          const endSig = await actions.endAuction(new PublicKey(id));
+          addToast("Auction ended", "success", explorerUrl(endSig));
         } catch (endErr: unknown) {
           const endMsg = endErr instanceof Error ? endErr.message : "";
           // Ignore if already ended
@@ -356,17 +380,18 @@ export default function AuctionRoomPage({
             throw new Error(`End auction failed: ${endMsg || "Unknown error"}`);
           }
         }
-        // Wait for ER to process the end
+        // sendErTransaction now awaits confirmation, but add a short buffer
+        // for ER state propagation before undelegation
         setProgressLabel("Waiting for confirmation...");
-        await new Promise((r) => setTimeout(r, 3000));
+        await new Promise((r) => setTimeout(r, 1000));
       }
 
       // Step 2: Undelegate from ER (if delegated)
       if (isDelegated) {
         setProgressLabel("Returning state to L1...");
         try {
-          await actions.undelegateAuction(new PublicKey(id));
-          addToast("Undelegated from ER", "success");
+          const undelSig = await actions.undelegateAuction(new PublicKey(id));
+          addToast("Undelegated from ER", "success", explorerUrl(undelSig));
         } catch (undelegateErr: unknown) {
           const undelegateMsg = undelegateErr instanceof Error ? undelegateErr.message : "";
           // Only ignore if truly not delegated
@@ -407,26 +432,26 @@ export default function AuctionRoomPage({
       // Step 3: Settle
       setProgressLabel("Settling auction...");
       try {
-        await actions.settleAuction(
+        const settleSig = await actions.settleAuction(
           new PublicKey(id),
           auction.nftMint,
           auction.seller,
           auction.highestBidder
         );
-        addToast("Auction settled!", "success");
+        addToast("Auction settled!", "success", explorerUrl(settleSig));
       } catch (settleErr: unknown) {
         console.error("[handleSettle] settle error:", settleErr);
         const settleMsg = settleErr instanceof Error ? settleErr.message : String(settleErr);
         // If settlement failed (likely insufficient deposit), try forfeit
         if (settleMsg.includes("InsufficientDeposit") || settleMsg.includes("0x1776")) {
           setProgressLabel("Winner defaulted — forfeiting auction...");
-          await actions.forfeitAuction(
+          const forfeitSig = await actions.forfeitAuction(
             new PublicKey(id),
             auction.nftMint,
             auction.seller,
             auction.highestBidder
           );
-          addToast("Auction forfeited — NFT returned to seller, winner deposit slashed", "success");
+          addToast("Auction forfeited — NFT returned to seller, winner deposit slashed", "success", explorerUrl(forfeitSig));
         } else {
           throw new Error(`Settle failed: ${settleMsg || "Unknown error"}`);
         }
@@ -510,8 +535,8 @@ export default function AuctionRoomPage({
     if (!auction || !publicKey) return;
     setActionLoading(true);
     try {
-      await actions.claimRefund(new PublicKey(id));
-      addToast("Refund claimed!", "success");
+      const refundSig = await actions.claimRefund(new PublicKey(id));
+      addToast("Refund claimed!", "success", explorerUrl(refundSig));
       await Promise.all([refetch(), refetchDeposit()]);
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "Refund failed");
@@ -528,8 +553,8 @@ export default function AuctionRoomPage({
     if (!auction || !publicKey) return;
     setActionLoading(true);
     try {
-      await actions.cancelAuction(new PublicKey(id), auction.nftMint);
-      addToast("Auction cancelled — NFT returned", "success");
+      const cancelSig = await actions.cancelAuction(new PublicKey(id), auction.nftMint);
+      addToast("Auction cancelled — NFT returned", "success", explorerUrl(cancelSig));
       await refetch();
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "Cancel failed");
@@ -546,8 +571,8 @@ export default function AuctionRoomPage({
     if (!auction || !publicKey) return;
     setActionLoading(true);
     try {
-      await actions.closeAuction(new PublicKey(id), auction.nftMint);
-      addToast("Auction closed — rent reclaimed!", "success");
+      const closeSig = await actions.closeAuction(new PublicKey(id), auction.nftMint);
+      addToast("Auction closed — rent reclaimed!", "success", explorerUrl(closeSig));
       await refetch();
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "Close failed");
@@ -931,8 +956,8 @@ export default function AuctionRoomPage({
                       setActionLoading(true);
                       setProgressLabel("Depositing SOL...");
                       try {
-                        await actions.deposit(new PublicKey(id), new BN(lamports));
-                        addToast(`Deposited ${formatSOL(lamports)} SOL`, "success");
+                        const depSig = await actions.deposit(new PublicKey(id), new BN(lamports));
+                        addToast(`Deposited ${formatSOL(lamports)} SOL`, "success", explorerUrl(depSig));
                         await refetchDeposit();
                       } catch (err: unknown) {
                         const msg = extractErrorMessage(err, "Deposit failed");

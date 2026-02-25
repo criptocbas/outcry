@@ -205,6 +205,22 @@ async function sendErTransaction(
   const sig = await connection.sendRawTransaction(signed.serialize(), {
     skipPreflight: true,
   });
+
+  // Wait for ER to confirm the transaction (matches the test pattern).
+  // Without this, sequential ER operations (end → undelegate) can race
+  // against each other because the previous tx hasn't landed yet.
+  try {
+    await connection.confirmTransaction(
+      { signature: sig, blockhash, lastValidBlockHeight },
+      "confirmed"
+    );
+  } catch (confirmErr) {
+    // Log but don't throw — the tx may have landed even if confirmation
+    // times out (e.g. WebSocket flakiness). Callers that depend on state
+    // changes should verify on-chain state before proceeding.
+    debugLog("[sendErTransaction] confirmation warning:", confirmErr);
+  }
+
   return sig;
 }
 
