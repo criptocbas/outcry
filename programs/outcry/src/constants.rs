@@ -20,6 +20,8 @@ pub const TOKEN_METADATA_PROGRAM_ID: Pubkey = Pubkey::new_from_array([
 pub const MIN_AUCTION_DURATION: u64 = 300; // 5 minutes
 pub const MAX_AUCTION_DURATION: u64 = 604_800; // 7 days
 
+pub const FORCE_CLOSE_GRACE_PERIOD: i64 = 604_800; // 7 days
+
 pub const AUCTION_SEED: &[u8] = b"auction";
 pub const VAULT_SEED: &[u8] = b"vault";
 pub const DEPOSIT_SEED: &[u8] = b"deposit";

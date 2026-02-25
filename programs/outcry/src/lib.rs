@@ -87,4 +87,12 @@ pub mod outcry {
     pub fn forfeit_auction(ctx: Context<ForfeitAuction>) -> Result<()> {
         instructions::forfeit_auction::handle_forfeit_auction(ctx)
     }
+
+    /// Force-closes an auction after the 7-day grace period.
+    /// Drains any unclaimed deposits from the vault to the seller and closes
+    /// all accounts. Use when bidders haven't claimed refunds and the seller's
+    /// accounts are stuck.
+    pub fn force_close_auction(ctx: Context<ForceCloseAuction>) -> Result<()> {
+        instructions::force_close_auction::handle_force_close_auction(ctx)
+    }
 }

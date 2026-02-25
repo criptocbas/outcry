@@ -10,6 +10,7 @@ pub mod claim_refund;
 pub mod cancel_auction;
 pub mod close_auction;
 pub mod forfeit_auction;
+pub mod force_close_auction;
 
 #[allow(ambiguous_glob_reexports)]
 pub use create_auction::*;
@@ -35,3 +36,5 @@ pub use cancel_auction::*;
 pub use close_auction::*;
 #[allow(ambiguous_glob_reexports)]
 pub use forfeit_auction::*;
+#[allow(ambiguous_glob_reexports)]
+pub use force_close_auction::*;

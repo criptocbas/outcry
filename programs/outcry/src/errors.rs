@@ -56,4 +56,6 @@ pub enum OutcryError {
     InvalidDepositAccount,
     #[msg("Vault has insufficient lamports for this operation")]
     InsufficientVaultBalance,
+    #[msg("Grace period has not elapsed — bidders still have time to claim refunds")]
+    GracePeriodNotElapsed,
 }
