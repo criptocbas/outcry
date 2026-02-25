@@ -1,9 +1,13 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useAuctions } from "@/hooks/useAuctions";
+import { parseAuctionStatus } from "@/hooks/useAuction";
+import type { AuctionStatusLabel } from "@/hooks/useAuction";
 import AuctionCard from "@/components/auction/AuctionCard";
+const PAGE_SIZE = 9;
 
 // ---------------------------------------------------------------------------
 // Animation variants
@@ -58,8 +62,31 @@ function SkeletonCard() {
 // Page
 // ---------------------------------------------------------------------------
 
+const STATUS_FILTERS: { label: string; value: AuctionStatusLabel | "All" }[] = [
+  { label: "All", value: "All" },
+  { label: "Active", value: "Active" },
+  { label: "Created", value: "Created" },
+  { label: "Ended", value: "Ended" },
+  { label: "Settled", value: "Settled" },
+];
+
 export default function HomePage() {
   const { auctions, loading, error, refetch } = useAuctions();
+  const [statusFilter, setStatusFilter] = useState<AuctionStatusLabel | "All">("All");
+  const [page, setPage] = useState(1);
+
+  const filtered = useMemo(() => {
+    if (statusFilter === "All") return auctions;
+    return auctions.filter(
+      (a) => parseAuctionStatus(a.account.status) === statusFilter
+    );
+  }, [auctions, statusFilter]);
+
+  const paginated = useMemo(
+    () => filtered.slice(0, page * PAGE_SIZE),
+    [filtered, page]
+  );
+  const hasMore = paginated.length < filtered.length;
 
   return (
     <div className="min-h-screen">
@@ -161,6 +188,32 @@ export default function HomePage() {
           </h2>
         </motion.div>
 
+        {/* Status filter bar */}
+        {!loading && auctions.length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label="Filter auctions by status">
+            {STATUS_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                role="tab"
+                aria-selected={statusFilter === f.value}
+                onClick={() => { setStatusFilter(f.value); setPage(1); }}
+                className={`rounded-full border px-3 py-1.5 text-[11px] font-medium tracking-[0.1em] uppercase transition-all ${
+                  statusFilter === f.value
+                    ? "border-gold/50 bg-gold/10 text-gold"
+                    : "border-charcoal-light text-cream/30 hover:border-cream/20 hover:text-cream/50"
+                }`}
+              >
+                {f.label}
+                {f.value !== "All" && (
+                  <span className="ml-1.5 text-[10px] opacity-60">
+                    {auctions.filter(a => parseAuctionStatus(a.account.status) === f.value).length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Error state */}
         {error && (
           <div className="flex flex-col items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/5 px-6 py-6 text-center">
@@ -184,7 +237,7 @@ export default function HomePage() {
         )}
 
         {/* Empty state */}
-        {!loading && !error && auctions.length === 0 && (
+        {!loading && !error && filtered.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -210,33 +263,47 @@ export default function HomePage() {
         )}
 
         {/* Auctions grid */}
-        {!loading && auctions.length > 0 && (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-40px" }}
-            className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
-          >
-            {auctions.map((item) => {
-              return (
-                <motion.div key={item.publicKey.toBase58()} variants={cardVariants}>
-                  <AuctionCard
-                    auction={{
-                      publicKey: item.publicKey.toBase58(),
-                      seller: item.account.seller.toBase58(),
-                      nftMint: item.account.nftMint.toBase58(),
-                      currentBid: item.account.currentBid.toNumber(),
-                      endTime: item.account.endTime.toNumber(),
-                      bidCount: item.account.bidCount,
-                      status: item.account.status,
-                      reservePrice: item.account.reservePrice.toNumber(),
-                    }}
-                  />
-                </motion.div>
-              );
-            })}
-          </motion.div>
+        {!loading && paginated.length > 0 && (
+          <>
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-40px" }}
+              className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              {paginated.map((item) => {
+                return (
+                  <motion.div key={item.publicKey.toBase58()} variants={cardVariants}>
+                    <AuctionCard
+                      auction={{
+                        publicKey: item.publicKey.toBase58(),
+                        seller: item.account.seller.toBase58(),
+                        nftMint: item.account.nftMint.toBase58(),
+                        currentBid: item.account.currentBid.toNumber(),
+                        endTime: item.account.endTime.toNumber(),
+                        bidCount: item.account.bidCount,
+                        status: item.account.status,
+                        reservePrice: item.account.reservePrice.toNumber(),
+                      }}
+                    />
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+
+            {/* Show more button */}
+            {hasMore && (
+              <div className="mt-10 flex justify-center">
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  className="rounded-md border border-gold/30 px-8 py-2.5 text-xs font-medium tracking-[0.15em] text-gold uppercase transition-all hover:border-gold hover:bg-gold/5"
+                >
+                  Show More ({filtered.length - paginated.length} remaining)
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>

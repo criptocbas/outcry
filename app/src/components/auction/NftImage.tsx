@@ -53,13 +53,14 @@ export default function NftImage({
         <div className="absolute inset-0 animate-shimmer" />
       )}
 
-      {/* Actual NFT image */}
+      {/* Actual NFT image with blur-up transition */}
       {hasImage && (
         <img
           src={metadata!.image!}
           alt={metadata?.name || "NFT"}
+          onLoad={(e) => e.currentTarget.classList.remove("blur-sm", "scale-105")}
           onError={() => setImgError(true)}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover blur-sm scale-105 transition-all duration-500"
           loading="lazy"
         />
       )}
