@@ -27,6 +27,9 @@ Thumbs.db
 # Locks (keep package-lock, ignore Cargo.lock for programs)
 # Cargo.lock is useful for reproducible builds, so track it
 
+# Private notes
+notes/
+
 # Misc
 *.swp
 *.swo

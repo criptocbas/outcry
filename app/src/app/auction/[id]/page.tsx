@@ -267,7 +267,7 @@ export default function AuctionRoomPage({
   const isCancelled = statusLabel === "Cancelled";
   const timerExpired =
     auction && auction.endTime.toNumber() > 0 &&
-    Math.floor(Date.now() / 1000) >= auction.endTime.toNumber();
+    Math.floor(Date.now() / 1000) + clockOffset >= auction.endTime.toNumber();
   const canSettle = !isSettled && !isCancelled && (isEnded || (isActive && timerExpired));
   const isWinner =
     auction && publicKey && auction.highestBidder
@@ -326,8 +326,6 @@ export default function AuctionRoomPage({
           setProgressLabel("Depositing SOL...");
           const depSig = await actions.deposit(new PublicKey(id), new BN(depositNeeded));
           addToast(`Deposited ${formatSOL(depositNeeded)} SOL`, "success", explorerUrl(depSig));
-          // Brief pause for L1 confirmation
-          await new Promise((r) => setTimeout(r, 1500));
           await refetchDeposit();
         }
 
@@ -362,7 +360,6 @@ export default function AuctionRoomPage({
         setProgressLabel("Starting auction...");
         const startSig = await actions.startAuction(new PublicKey(id), auction.nftMint);
         addToast("Auction started!", "success", explorerUrl(startSig));
-        await new Promise((r) => setTimeout(r, 2000));
         await refetch();
       }
 

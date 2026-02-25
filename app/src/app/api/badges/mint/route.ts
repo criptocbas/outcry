@@ -185,9 +185,6 @@ export async function POST(req: NextRequest) {
     // "present" — no on-chain proof of viewership, allow any valid pubkey
   }
 
-  // Mark as minted before processing to prevent concurrent duplicate calls
-  mintedAuctions.add(auctionId);
-
   // Build server-side Umi with deployer keypair
   const keypairBytes = JSON.parse(TREE_AUTHORITY_KEY) as number[];
   const wallet = Keypair.fromSecretKey(Uint8Array.from(keypairBytes));
@@ -224,6 +221,11 @@ export async function POST(req: NextRequest) {
         error: msg,
       });
     }
+  }
+
+  // Only mark as minted if at least one badge succeeded (allows retry on total failure)
+  if (results.some((r) => r.success)) {
+    mintedAuctions.add(auctionId);
   }
 
   return NextResponse.json({ results });

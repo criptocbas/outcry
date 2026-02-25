@@ -57,7 +57,9 @@ pub fn handle_place_bid(ctx: Context<PlaceBid>, amount: u64) -> Result<()> {
 
     // Anti-snipe: extend if bid arrives within extension_window of end.
     // Cap total extensions at the original auction duration to prevent indefinite extension.
-    let time_remaining = auction.end_time - clock.unix_timestamp;
+    let time_remaining = auction.end_time
+        .checked_sub(clock.unix_timestamp)
+        .ok_or(OutcryError::ArithmeticOverflow)?;
     if time_remaining < auction.extension_window as i64 {
         let max_end_time = auction
             .start_time
