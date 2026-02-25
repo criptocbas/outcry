@@ -147,6 +147,7 @@ export default function AuctionRoomPage({
   const [prevBid, setPrevBid] = useState<number | null>(null);
   const [prevHighestBidder, setPrevHighestBidder] = useState<string | null>(null);
   const [bidHistory, setBidHistory] = useState<Array<{ bidder: string; amount: number; timestamp: number }>>([]);
+  const [lastBidSpeedMs, setLastBidSpeedMs] = useState<number | null>(null);
 
   const addToast = useCallback(
     (message: string, type: "success" | "error", link?: string) => {
@@ -331,9 +332,9 @@ export default function AuctionRoomPage({
 
         // Step 2: Place bid
         setProgressLabel("Placing bid...");
-        await actions.placeBid(new PublicKey(id), new BN(bidLamports));
-        // ER transactions don't appear on Solana Explorer — no explorer link
-        addToast(`Bid placed: ${formatSOL(bidLamports)} SOL`, "success");
+        const { sendMs } = await actions.placeBid(new PublicKey(id), new BN(bidLamports));
+        setLastBidSpeedMs(sendMs);
+        addToast(`Bid placed: ${formatSOL(bidLamports)} SOL — ${sendMs}ms via Ephemeral Rollup`, "success");
         await refetch();
       } catch (err: unknown) {
         const msg = extractErrorMessage(err, "Bid failed");
@@ -343,7 +344,7 @@ export default function AuctionRoomPage({
         setProgressLabel(null);
       }
     },
-    [auction, actions, id, addToast, refetch, refetchDeposit, bidderDepositAccount]
+    [auction, actions, id, publicKey, addToast, refetch, refetchDeposit, bidderDepositAccount]
   );
 
   // -------------------------------------------------------------------------
@@ -1187,6 +1188,16 @@ export default function AuctionRoomPage({
 
             {/* Bid History */}
             <div className="rounded-lg border border-charcoal-light bg-charcoal p-5">
+              {lastBidSpeedMs !== null && (
+                <div className="mb-3 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5">
+                  <span className="text-[10px] font-semibold tracking-wide text-emerald-400 uppercase">
+                    Last bid: {lastBidSpeedMs}ms
+                  </span>
+                  <span className="text-[10px] text-emerald-400/50">
+                    via Ephemeral Rollup
+                  </span>
+                </div>
+              )}
               <BidHistory bids={bidHistory} />
             </div>
 

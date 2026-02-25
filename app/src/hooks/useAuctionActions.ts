@@ -42,8 +42,8 @@ export interface UseAuctionActionsReturn {
   /** Delegate the AuctionState PDA to the Ephemeral Rollup (seller only). */
   delegateAuction: (auctionStatePubkey: PublicKey, nftMint: PublicKey) => Promise<string>;
 
-  /** Place a bid on an active (possibly ER-delegated) auction. */
-  placeBid: (auctionStatePubkey: PublicKey, amount: BN) => Promise<string>;
+  /** Place a bid on an active (possibly ER-delegated) auction. Returns signature + ER send latency in ms. */
+  placeBid: (auctionStatePubkey: PublicKey, amount: BN) => Promise<{ signature: string; sendMs: number }>;
 
   /** End an auction (permissionless crank). */
   endAuction: (auctionStatePubkey: PublicKey) => Promise<string>;
@@ -193,7 +193,7 @@ async function sendErTransaction(
   walletAdapter: { signTransaction: (tx: import("@solana/web3.js").Transaction) => Promise<import("@solana/web3.js").Transaction> },
   feePayer: PublicKey,
   connection: Connection
-): Promise<string> {
+): Promise<{ signature: string; sendMs: number }> {
   const tx = await txBuilder.transaction();
   tx.feePayer = feePayer;
 
@@ -243,7 +243,7 @@ async function sendErTransaction(
     debugLog("[sendErTransaction] confirmation warning:", confirmErr);
   }
 
-  return sig;
+  return { signature: sig, sendMs };
 }
 
 // ---------------------------------------------------------------------------
@@ -419,7 +419,7 @@ export function useAuctionActions(): UseAuctionActionsReturn {
   // placeBid (auto-routed to ER if delegated)
   // -----------------------------------------------------------------------
   const placeBid = useCallback(
-    async (auctionStatePubkey: PublicKey, amount: BN): Promise<string> => {
+    async (auctionStatePubkey: PublicKey, amount: BN): Promise<{ signature: string; sendMs: number }> => {
       if (!erProgram || !publicKey || !wallet) {
         throw new Error("Wallet not connected");
       }
@@ -448,7 +448,7 @@ export function useAuctionActions(): UseAuctionActionsReturn {
         throw new Error("Wallet not connected");
       }
 
-      return sendErTransaction(
+      const { signature } = await sendErTransaction(
         erProgram.methods
           .endAuction()
           .accounts({
@@ -459,6 +459,7 @@ export function useAuctionActions(): UseAuctionActionsReturn {
         publicKey,
         magicConnection
       );
+      return signature;
     },
     [erProgram, publicKey, wallet, magicConnection]
   );
@@ -472,7 +473,7 @@ export function useAuctionActions(): UseAuctionActionsReturn {
         throw new Error("Wallet not connected");
       }
 
-      return sendErTransaction(
+      const { signature } = await sendErTransaction(
         erProgram.methods
           .undelegateAuction()
           .accounts({
@@ -485,6 +486,7 @@ export function useAuctionActions(): UseAuctionActionsReturn {
         publicKey,
         magicConnection
       );
+      return signature;
     },
     [erProgram, publicKey, wallet, magicConnection]
   );

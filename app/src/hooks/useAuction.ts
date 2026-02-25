@@ -175,8 +175,13 @@ export function useAuction(auctionPublicKey: string | null): UseAuctionReturn {
 
   // Polling fallback: Magic Router WebSocket may not relay ER account changes.
   // Only polls when WebSocket hasn't delivered an update in 5+ seconds.
+  // Skip polling entirely for terminal states (Settled/Cancelled) — they'll never change.
+  const isTerminal = auction
+    ? "settled" in auction.status || "cancelled" in auction.status
+    : false;
+
   useEffect(() => {
-    if (!auctionPublicKey) return;
+    if (!auctionPublicKey || isTerminal) return;
 
     const interval = setInterval(() => {
       if (fetchingRef.current) return;
@@ -186,7 +191,7 @@ export function useAuction(auctionPublicKey: string | null): UseAuctionReturn {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [auctionPublicKey, wallet, fetchAuction]);
+  }, [auctionPublicKey, wallet, fetchAuction, isTerminal]);
 
   return {
     auction,
