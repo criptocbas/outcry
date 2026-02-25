@@ -11,11 +11,6 @@ use crate::{
     state::{AuctionState, AuctionStatus, AuctionVault, BidderDeposit},
 };
 
-/// Metaplex Token Metadata program ID (for cross-program PDA validation)
-pub mod token_metadata_program {
-    anchor_lang::declare_id!("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-}
-
 /// Parsed creator from Metaplex metadata
 struct MetaplexCreator {
     address: Pubkey,
@@ -144,11 +139,11 @@ pub struct SettleAuction<'info> {
     #[account(
         seeds = [
             b"metadata",
-            token_metadata_program::ID.as_ref(),
+            TOKEN_METADATA_PROGRAM_ID.as_ref(),
             nft_mint.key().as_ref(),
         ],
         bump,
-        seeds::program = token_metadata_program::ID,
+        seeds::program = TOKEN_METADATA_PROGRAM_ID,
     )]
     pub nft_metadata: UncheckedAccount<'info>,
 
