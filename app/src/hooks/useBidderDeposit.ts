@@ -60,8 +60,34 @@ export function useBidderDeposit(
   }, [auctionPublicKey, bidderPublicKey, wallet, connection]);
 
   useEffect(() => {
-    fetchDeposit();
-  }, [fetchDeposit]);
+    let stale = false;
+
+    (async () => {
+      if (!auctionPublicKey || !bidderPublicKey) {
+        setDeposit(null);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const program = wallet ? getProgram(connection, wallet) : getReadOnlyProgram(connection);
+        const auctionPk = new PublicKey(auctionPublicKey);
+        const bidderPk = new PublicKey(bidderPublicKey);
+        const [depositPda] = getDepositPDA(auctionPk, bidderPk);
+
+        const account = await (
+          program.account as Record<string, { fetch: (key: PublicKey) => Promise<unknown> }>
+        )["bidderDeposit"].fetch(depositPda);
+        if (!stale) setDeposit(account as unknown as BidderDepositAccount);
+      } catch {
+        if (!stale) setDeposit(null);
+      } finally {
+        if (!stale) setLoading(false);
+      }
+    })();
+
+    return () => { stale = true; };
+  }, [auctionPublicKey, bidderPublicKey, wallet, connection]);
 
   return { deposit, loading, refetch: fetchDeposit };
 }
