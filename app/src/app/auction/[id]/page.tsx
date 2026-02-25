@@ -539,12 +539,25 @@ export default function AuctionRoomPage({
   // ---------------------------------------------------------------------------
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gold/30 border-t-gold" />
-          <p className="text-xs tracking-[0.2em] text-cream/40 uppercase">
-            Loading auction...
-          </p>
+      <div className="mx-auto max-w-7xl px-6 pt-8 pb-24">
+        <div className="mb-6 h-4 w-32 animate-shimmer rounded" />
+        <div className="flex flex-col gap-8 lg:flex-row lg:gap-12">
+          {/* Left: artwork skeleton */}
+          <div className="flex-1 lg:max-w-[60%]">
+            <div className="aspect-square w-full animate-shimmer rounded-xl" />
+            <div className="mt-4 h-8 w-48 animate-shimmer rounded" />
+            <div className="mt-6 space-y-3 border-t border-charcoal-light pt-6">
+              <div className="h-10 w-full animate-shimmer rounded" />
+              <div className="h-4 w-3/4 animate-shimmer rounded" />
+            </div>
+          </div>
+          {/* Right: control panel skeleton */}
+          <div className="flex flex-col gap-6 lg:w-[40%]">
+            <div className="h-8 w-24 animate-shimmer rounded-full" />
+            <div className="h-24 w-full animate-shimmer rounded-lg" />
+            <div className="h-20 w-full animate-shimmer rounded-lg" />
+            <div className="h-40 w-full animate-shimmer rounded-lg" />
+          </div>
         </div>
       </div>
     );
