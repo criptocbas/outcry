@@ -37,18 +37,23 @@ export default function UmiProvider({ children }: { children: ReactNode }) {
   // Use Helius for DAS API support, fall back to the current connection endpoint
   const endpoint = HELIUS_RPC || connection.rpcEndpoint;
 
+  // Stabilize dependency — only recreate Umi when the connected key changes,
+  // not on every render (wallet object reference is unstable).
+  const walletKey = wallet.publicKey?.toBase58() ?? null;
+
   const umi = useMemo(() => {
     const instance = createUmi(endpoint)
       .use(mplBubblegum())
       .use(dasApi());
 
     // Attach wallet identity when connected
-    if (wallet.publicKey) {
+    if (walletKey) {
       return instance.use(walletAdapterIdentity(wallet));
     }
 
     return instance;
-  }, [endpoint, wallet]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endpoint, walletKey]);
 
   return <UmiContext.Provider value={umi}>{children}</UmiContext.Provider>;
 }
