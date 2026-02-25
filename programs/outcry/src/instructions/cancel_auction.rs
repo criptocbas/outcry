@@ -49,7 +49,6 @@ pub fn handle_cancel_auction(ctx: Context<CancelAuction>) -> Result<()> {
             || (auction.status == AuctionStatus::Ended && auction.bid_count == 0),
         OutcryError::InvalidAuctionStatus
     );
-    require!(auction.bid_count == 0, OutcryError::CannotCancelWithBids);
 
     // Return NFT to seller
     let seller_key = ctx.accounts.seller.key();

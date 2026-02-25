@@ -24,7 +24,7 @@ pub struct ForfeitAuction<'info> {
     #[account(
         mut,
         constraint = auction_state.status == AuctionStatus::Ended @ OutcryError::InvalidAuctionStatus,
-        constraint = auction_state.bid_count > 0 @ OutcryError::CannotCancelWithBids,
+        constraint = auction_state.bid_count > 0 @ OutcryError::NoBidsToSettle,
     )]
     pub auction_state: Account<'info, AuctionState>,
 
@@ -91,7 +91,8 @@ pub fn handle_forfeit_auction(ctx: Context<ForfeitAuction>) -> Result<()> {
     let winner_deposit_amount = if !ctx.accounts.winner_deposit.data_is_empty() {
         let data = ctx.accounts.winner_deposit.try_borrow_data()?;
         let mut slice: &[u8] = &data;
-        let deposit = BidderDeposit::try_deserialize(&mut slice)?;
+        let deposit = BidderDeposit::try_deserialize(&mut slice)
+            .map_err(|_| error!(OutcryError::InvalidDepositAccount))?;
         drop(data);
         deposit.amount
     } else {

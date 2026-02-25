@@ -58,8 +58,8 @@ pub fn handle_place_bid(ctx: Context<PlaceBid>, amount: u64) -> Result<()> {
     // Anti-snipe: extend if bid arrives within extension_window of end
     let time_remaining = auction.end_time - clock.unix_timestamp;
     if time_remaining < auction.extension_window as i64 {
-        auction.end_time = clock
-            .unix_timestamp
+        auction.end_time = auction
+            .end_time
             .checked_add(auction.extension_seconds as i64)
             .ok_or(OutcryError::ArithmeticOverflow)?;
     }
