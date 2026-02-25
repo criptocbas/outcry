@@ -549,6 +549,23 @@ export function useAuctionActions(): UseAuctionActionsReturn {
       tx.recentBlockhash = blockhash;
       tx.lastValidBlockHeight = lastValidBlockHeight;
 
+      // Simulate before asking user to sign — catches on-chain errors early
+      try {
+        const simResult = await l1Connection.simulateTransaction(tx);
+        if (simResult.value.err) {
+          const simLogs = simResult.value.logs ?? [];
+          const errorLog = simLogs.find(l => l.includes("Error") || l.includes("failed"));
+          throw new Error(errorLog || JSON.stringify(simResult.value.err));
+        }
+        debugLog("[settle] simulation passed");
+      } catch (simErr) {
+        if (simErr instanceof Error && simErr.message.includes("Error")) {
+          throw new Error(`Simulation failed: ${simErr.message}`);
+        }
+        // Non-critical simulation errors (e.g. RPC issues) — proceed anyway
+        debugLog("[settle] simulation warning:", simErr);
+      }
+
       let signed;
       try {
         signed = await wallet.signTransaction(tx);

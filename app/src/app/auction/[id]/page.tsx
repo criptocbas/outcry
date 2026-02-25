@@ -132,8 +132,14 @@ export default function AuctionRoomPage({
 
   const addToast = useCallback(
     (message: string, type: "success" | "error") => {
-      const newToast: Toast = { id: Date.now(), message, type };
-      setToasts((prev) => [...prev, newToast]);
+      setToasts((prev) => {
+        // Deduplicate: skip if identical message already showing
+        if (prev.some((t) => t.message === message)) return prev;
+        const newToast: Toast = { id: Date.now(), message, type };
+        // Limit to 3 concurrent toasts — drop oldest
+        const updated = [...prev, newToast];
+        return updated.length > 3 ? updated.slice(-3) : updated;
+      });
     },
     []
   );
@@ -187,8 +193,25 @@ export default function AuctionRoomPage({
     setPrevHighestBidder(currentBidder);
   }, [auction?.currentBid?.toString(), auction?.highestBidder?.toBase58()]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Check ER delegation status
+  // Compute clock offset (chain time - client time) for accurate countdown
   const l1Connection = useMemo(() => new Connection(DEVNET_RPC, "confirmed"), []);
+  const [clockOffset, setClockOffset] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const slot = await l1Connection.getSlot();
+        const blockTime = await l1Connection.getBlockTime(slot);
+        if (blockTime && !cancelled) {
+          setClockOffset(blockTime - Math.floor(Date.now() / 1000));
+        }
+      } catch { /* non-critical */ }
+    })();
+    return () => { cancelled = true; };
+  }, [l1Connection]);
+
+  // Check ER delegation status
   const [isDelegated, setIsDelegated] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -734,6 +757,7 @@ export default function AuctionRoomPage({
               <CountdownTimer
                 endTime={auction.endTime.toNumber()}
                 status={statusLabel?.toLowerCase() ?? "created"}
+                clockOffset={clockOffset}
               />
             </div>
 

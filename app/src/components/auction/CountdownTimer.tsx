@@ -5,25 +5,28 @@ import { useEffect, useState } from "react";
 interface CountdownTimerProps {
   endTime: number;
   status: string;
+  /** Seconds to add to Date.now() to approximate blockchain time (chain - client). */
+  clockOffset?: number;
 }
 
-export default function CountdownTimer({ endTime, status }: CountdownTimerProps) {
+export default function CountdownTimer({ endTime, status, clockOffset = 0 }: CountdownTimerProps) {
   const [timeLeft, setTimeLeft] = useState<number>(() =>
-    Math.max(0, Math.floor(endTime - Date.now() / 1000))
+    Math.max(0, Math.floor(endTime - (Date.now() / 1000 + clockOffset)))
   );
 
   useEffect(() => {
     if (status !== "active") return;
 
     const tick = () => {
-      const remaining = Math.max(0, Math.floor(endTime - Date.now() / 1000));
+      const now = Date.now() / 1000 + clockOffset;
+      const remaining = Math.max(0, Math.floor(endTime - now));
       setTimeLeft(remaining);
     };
 
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [endTime, status]);
+  }, [endTime, status, clockOffset]);
 
   if (status !== "active" || timeLeft <= 0) {
     const statusLabel =
