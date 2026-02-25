@@ -270,10 +270,11 @@ export default function CreateAuctionPage() {
               animate="visible"
               className="flex flex-col gap-2"
             >
-              <label className="text-[11px] font-medium tracking-[0.2em] text-cream/50 uppercase">
+              <label htmlFor="nft-mint" className="text-[11px] font-medium tracking-[0.2em] text-cream/50 uppercase">
                 NFT Mint Address
               </label>
               <input
+                id="nft-mint"
                 type="text"
                 value={nftMint}
                 onChange={(e) => setNftMint(e.target.value)}
@@ -295,11 +296,12 @@ export default function CreateAuctionPage() {
               animate="visible"
               className="flex flex-col gap-2"
             >
-              <label className="text-[11px] font-medium tracking-[0.2em] text-cream/50 uppercase">
+              <label htmlFor="reserve-price" className="text-[11px] font-medium tracking-[0.2em] text-cream/50 uppercase">
                 Reserve Price
               </label>
               <div className="relative">
                 <input
+                  id="reserve-price"
                   type="number"
                   step="0.01"
                   min="0.01"
@@ -325,11 +327,12 @@ export default function CreateAuctionPage() {
               animate="visible"
               className="flex flex-col gap-2"
             >
-              <label className="text-[11px] font-medium tracking-[0.2em] text-cream/50 uppercase">
+              <label htmlFor="duration" className="text-[11px] font-medium tracking-[0.2em] text-cream/50 uppercase">
                 Duration
               </label>
               <div className="relative">
                 <select
+                  id="duration"
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
                   className="w-full appearance-none rounded-md border border-charcoal-light bg-jet px-4 py-3 text-sm text-cream focus-gold"
@@ -368,11 +371,12 @@ export default function CreateAuctionPage() {
               animate="visible"
               className="flex flex-col gap-2"
             >
-              <label className="text-[11px] font-medium tracking-[0.2em] text-cream/50 uppercase">
+              <label htmlFor="min-bid-increment" className="text-[11px] font-medium tracking-[0.2em] text-cream/50 uppercase">
                 Minimum Bid Increment
               </label>
               <div className="relative">
                 <input
+                  id="min-bid-increment"
                   type="number"
                   step="0.01"
                   min="0.01"

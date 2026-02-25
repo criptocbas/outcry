@@ -50,7 +50,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
       <motion.div
         whileHover={{ scale: 1.02 }}
         transition={{ duration: 0.25, ease: "easeOut" }}
-        className="group cursor-pointer overflow-hidden rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] transition-all duration-300 hover:border-[#C6A961]/60 hover:shadow-[0_0_20px_rgba(198,169,97,0.15)]"
+        className="group cursor-pointer overflow-hidden rounded-lg border border-charcoal-light bg-charcoal transition-all duration-300 hover:border-gold/60 hover:shadow-[0_0_20px_rgba(198,169,97,0.15)]"
       >
         {/* NFT Artwork */}
         <div className="relative aspect-square w-full">
@@ -70,26 +70,14 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
           {/* Bid amount */}
           <div className="mb-2 flex items-baseline justify-between">
             <div className="flex flex-col">
-              <span
-                className="text-[9px] tracking-[0.2em] text-[#F5F0E8]/30 uppercase"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
+              <span className="text-[9px] tracking-[0.2em] text-cream/30 uppercase">
                 {bidLabel}
               </span>
               <div className="flex items-baseline gap-1.5">
-                <span
-                  className="text-xl font-bold tabular-nums text-[#C6A961]"
-                  style={{
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
+                <span className="text-xl font-bold tabular-nums text-gold">
                   {formatSOL(displayBid)}
                 </span>
-                <span
-                  className="text-[10px] font-medium text-[#C6A961]/50 uppercase"
-                  style={{ fontFamily: "'DM Sans', sans-serif" }}
-                >
+                <span className="text-[10px] font-medium text-gold/50 uppercase">
                   SOL
                 </span>
               </div>
@@ -97,19 +85,10 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
 
             {/* Bid count */}
             <div className="flex flex-col items-end">
-              <span
-                className="text-[9px] tracking-[0.2em] text-[#F5F0E8]/30 uppercase"
-                style={{ fontFamily: "'DM Sans', sans-serif" }}
-              >
+              <span className="text-[9px] tracking-[0.2em] text-cream/30 uppercase">
                 Bids
               </span>
-              <span
-                className="text-sm tabular-nums text-[#F5F0E8]/60"
-                style={{
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
+              <span className="text-sm tabular-nums text-cream/60">
                 {auction.bidCount}
               </span>
             </div>
@@ -117,7 +96,7 @@ export default function AuctionCard({ auction }: AuctionCardProps) {
 
           {/* Footer: timer */}
           {statusKey === "active" && (
-            <div className="border-t border-[#2A2A2A] pt-2">
+            <div className="border-t border-charcoal-light pt-2">
               <TimeRemaining endTime={auction.endTime} />
             </div>
           )}
