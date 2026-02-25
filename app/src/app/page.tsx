@@ -163,8 +163,14 @@ export default function HomePage() {
 
         {/* Error state */}
         {error && (
-          <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-6 py-4 text-center text-sm text-red-400">
-            {error}
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/5 px-6 py-6 text-center">
+            <p className="text-sm text-red-400">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="rounded-md border border-red-500/30 px-4 py-2 text-xs font-medium tracking-[0.1em] text-red-400 uppercase transition-all hover:border-red-400 hover:bg-red-500/10"
+            >
+              Retry
+            </button>
           </div>
         )}
 

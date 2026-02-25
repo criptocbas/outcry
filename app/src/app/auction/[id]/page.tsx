@@ -468,6 +468,7 @@ export default function AuctionRoomPage({
         }
       } catch (badgeErr) {
         console.error("Badge minting failed (non-critical):", badgeErr);
+        addToast("Badge minting failed — you can retry later", "error");
       }
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "Settlement failed");
@@ -724,6 +725,33 @@ export default function AuctionRoomPage({
                 )}
             </div>
 
+            {/* Winner announcement */}
+            {isSettled && auction.highestBidder && auction.currentBid.toNumber() > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="relative overflow-hidden rounded-lg border border-gold/40 bg-gradient-to-b from-gold/10 to-transparent p-6 text-center"
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(198,169,97,0.08),transparent_70%)]" />
+                <p className="relative mb-1 text-[10px] tracking-[0.3em] text-gold/60 uppercase">
+                  Sold
+                </p>
+                <p className="relative font-serif text-2xl font-semibold italic text-gold">
+                  {formatSOL(auction.currentBid.toNumber())} SOL
+                </p>
+                <div className="relative mt-3 flex items-center justify-center gap-1.5">
+                  <span className="text-xs text-cream/40">Won by</span>
+                  <BidderName wallet={auction.highestBidder.toBase58()} />
+                </div>
+                {isWinner && (
+                  <p className="relative mt-3 text-xs font-medium text-gold/80">
+                    Congratulations, you won!
+                  </p>
+                )}
+              </motion.div>
+            )}
+
             {/* Bid Panel — unified deposit+bid flow (during Active, timer not expired) */}
             {isActive && !isSeller && !timerExpired && (
               <BidPanel
@@ -733,6 +761,7 @@ export default function AuctionRoomPage({
                   highestBidder: auction.highestBidder?.toBase58() ?? null,
                   status: auction.status,
                   reservePrice: auction.reservePrice.toNumber(),
+                  minBidIncrement: auction.minBidIncrement.toNumber(),
                 }}
                 onBid={handleBid}
                 userDeposit={userDeposit}
@@ -819,6 +848,7 @@ export default function AuctionRoomPage({
                       highestBidder: null,
                       status: auction.status,
                       reservePrice: auction.reservePrice.toNumber(),
+                      minBidIncrement: auction.minBidIncrement.toNumber(),
                     }}
                     onBid={async (lamports) => {
                       // Pre-auction: just deposit, don't bid

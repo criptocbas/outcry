@@ -5,13 +5,12 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { formatSOL } from "@/lib/utils";
 import Spinner from "@/components/ui/Spinner";
 
-const MIN_BID_INCREMENT_LAMPORTS = 100_000_000; // 0.1 SOL
-
 interface AuctionState {
   currentBid: number;
   highestBidder: string | null;
   status: object;
   reservePrice: number;
+  minBidIncrement: number;
 }
 
 interface BidPanelProps {
@@ -49,10 +48,10 @@ export default function BidPanel({
 
   const minBid = useMemo(() => {
     if (auctionState.currentBid > 0) {
-      return auctionState.currentBid + MIN_BID_INCREMENT_LAMPORTS;
+      return auctionState.currentBid + auctionState.minBidIncrement;
     }
     return auctionState.reservePrice;
-  }, [auctionState.currentBid, auctionState.reservePrice]);
+  }, [auctionState.currentBid, auctionState.reservePrice, auctionState.minBidIncrement]);
 
   const [bidInput, setBidInput] = useState<string>(formatSOL(minBid));
   const [userEdited, setUserEdited] = useState(false);

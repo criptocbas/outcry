@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, DM_Sans } from "next/font/google";
 import Providers from "@/providers/Providers";
 import Header from "@/components/layout/Header";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import "./globals.css";
 
 const playfairDisplay = Playfair_Display({
@@ -24,6 +25,23 @@ export const metadata: Metadata = {
   title: "OUTCRY — Live Auctions on Solana",
   description:
     "Going, going, onchain. Real-time live auctions powered by MagicBlock Ephemeral Rollups.",
+  metadataBase: new URL("https://outcry.art"),
+  openGraph: {
+    title: "OUTCRY — Live Auctions on Solana",
+    description:
+      "Going, going, onchain. Real-time live auctions powered by MagicBlock Ephemeral Rollups.",
+    type: "website",
+    siteName: "OUTCRY",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "OUTCRY — Live Auctions on Solana",
+    description:
+      "Going, going, onchain. Real-time live auctions powered by MagicBlock Ephemeral Rollups.",
+  },
+  other: {
+    "theme-color": "#0A0A0A",
+  },
 };
 
 export default function RootLayout({
@@ -38,7 +56,9 @@ export default function RootLayout({
       >
         <Providers>
           <Header />
-          <main className="pt-16">{children}</main>
+          <main className="pt-16">
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </main>
         </Providers>
       </body>
     </html>
