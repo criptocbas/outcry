@@ -109,7 +109,7 @@ export default function BidPanel({
   }, [minBid]);
 
   return (
-    <div id={id} className="flex flex-col gap-4 rounded-lg border border-charcoal-light bg-charcoal p-5">
+    <div id={id} className="flex flex-col gap-4 rounded-lg border border-charcoal-light bg-charcoal p-5" role="region" aria-label="Bid controls">
       {/* Seller message */}
       {isSeller ? (
         <p className="text-center text-xs text-cream/40">
@@ -126,6 +126,7 @@ export default function BidPanel({
             {quickBids.map((qb) => (
               <button
                 key={qb.value}
+                aria-label={`Bid ${qb.label} SOL`}
                 onClick={() => { setBidInput(formatSOL(qb.value)); setUserEdited(false); }}
                 className={`flex-1 rounded-md border py-2 text-xs font-medium tabular-nums transition-all ${
                   bidLamports === qb.value
@@ -146,6 +147,7 @@ export default function BidPanel({
               min="0"
               value={bidInput}
               onChange={(e) => { setBidInput(e.target.value); setUserEdited(true); }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleBidClick(); }}
               aria-label="Bid amount in SOL"
               className="w-full rounded-md border border-charcoal-light bg-jet px-4 py-3 pr-14 text-right text-lg tabular-nums text-cream placeholder-cream/20 outline-none transition-colors focus:border-gold/60 focus:ring-1 focus:ring-gold/30"
             />

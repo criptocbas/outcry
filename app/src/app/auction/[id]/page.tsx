@@ -763,6 +763,9 @@ export default function AuctionRoomPage({
 
             {/* Current bid display — with flash animation */}
             <div
+              role="status"
+              aria-live="polite"
+              aria-label="Current bid amount"
               className={`flex flex-col items-center rounded-lg border border-charcoal-light bg-charcoal px-6 py-5 transition-all duration-300 ${
                 bidFlash ? "border-gold/60 shadow-[0_0_40px_rgba(198,169,97,0.25)] animate-bid-flash" : ""
               }`}
@@ -1010,6 +1013,7 @@ export default function AuctionRoomPage({
                 <button
                   onClick={handleClaimRefund}
                   disabled={actionLoading}
+                  aria-label={`Claim refund of ${formatSOL(userDeposit)} SOL`}
                   className="flex h-12 w-full items-center justify-center rounded-md border border-gold/40 text-sm font-medium tracking-[0.15em] text-gold uppercase transition-all duration-200 hover:border-gold hover:bg-gold/5 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {actionLoading ? <Spinner /> : "Claim Refund"}
