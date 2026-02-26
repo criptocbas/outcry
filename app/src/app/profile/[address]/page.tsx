@@ -100,8 +100,8 @@ export default function ProfilePage({
       setRegisterError("Username must be at least 3 characters.");
       return;
     }
-    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
-      setRegisterError("Letters, numbers, and underscores only.");
+    if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+      setRegisterError("Letters, numbers, underscores, and hyphens only.");
       return;
     }
     setRegisterError(null);
@@ -129,8 +129,8 @@ export default function ProfilePage({
       setEditError("Username must be at least 3 characters.");
       return;
     }
-    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
-      setEditError("Letters, numbers, and underscores only.");
+    if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+      setEditError("Letters, numbers, underscores, and hyphens only.");
       return;
     }
     setEditError(null);

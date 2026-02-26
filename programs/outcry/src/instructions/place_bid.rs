@@ -56,14 +56,17 @@ pub fn handle_place_bid(ctx: Context<PlaceBid>, amount: u64) -> Result<()> {
         .ok_or(OutcryError::ArithmeticOverflow)?;
 
     // Anti-snipe: extend if bid arrives within extension_window of end.
-    // Cap total extensions at the original auction duration to prevent indefinite extension.
+    // Cap total extensions at original_duration + min(original_duration, 1 hour).
     let time_remaining = auction.end_time
         .checked_sub(clock.unix_timestamp)
         .ok_or(OutcryError::ArithmeticOverflow)?;
     if time_remaining < auction.extension_window as i64 {
+        let max_extension = std::cmp::min(auction.duration_seconds as i64, 3600);
         let max_end_time = auction
             .start_time
-            .checked_add(auction.duration_seconds as i64 * 2)
+            .checked_add(auction.duration_seconds as i64)
+            .ok_or(OutcryError::ArithmeticOverflow)?
+            .checked_add(max_extension)
             .ok_or(OutcryError::ArithmeticOverflow)?;
         let proposed_end = auction
             .end_time

@@ -20,7 +20,7 @@ export async function GET(
 
   try {
     const res = await fetch(
-      `${TAPESTRY_BASE}/profiles/${encodeURIComponent(id)}/followers?apiKey=${API_KEY}&page=1&pageSize=${encodeURIComponent(limit)}`
+      `${TAPESTRY_BASE}/profiles/${encodeURIComponent(id)}/followers?apiKey=${API_KEY}&page=1&pageSize=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`
     );
     const data = await res.json();
 

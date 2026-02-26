@@ -82,7 +82,7 @@ export function useAuctionLike(
         .finally(() => {
           pollingRef.current = false;
         });
-    }, 15_000);
+    }, 5_000);
 
     return () => {
       cancelled = true;
