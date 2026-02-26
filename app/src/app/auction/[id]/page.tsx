@@ -19,7 +19,7 @@ import LikeButton from "@/components/social/LikeButton";
 import CommentSection from "@/components/social/CommentSection";
 import { truncateAddress, formatSOL } from "@/lib/utils";
 import Spinner from "@/components/ui/Spinner";
-import { useTapestryProfile } from "@/hooks/useTapestryProfile";
+import { useTapestryProfile, prefetchProfiles } from "@/hooks/useTapestryProfile";
 import { useNftMetadata } from "@/hooks/useNftMetadata";
 import { getProfile, createContent } from "@/lib/tapestry";
 import { getAuctionBidders, getDepositPDA } from "@/lib/program";
@@ -189,6 +189,11 @@ export default function AuctionRoomPage({
       setBidFlash(true);
       setTimeout(() => setBidFlash(false), 800);
 
+      // Pre-warm cache for new bidder so username resolves instantly
+      if (currentBidder) {
+        prefetchProfiles([currentBidder]);
+      }
+
       // Accumulate into history (deduplicate by amount — bids are strictly increasing)
       setBidHistory(prev => {
         if (prev.some(b => b.amount === currentBid)) return prev;
@@ -233,6 +238,31 @@ export default function AuctionRoomPage({
     })();
     return () => { cancelled = true; };
   }, [l1Connection]);
+
+  // Pre-warm Tapestry profile cache on initial auction load
+  // so usernames resolve instantly when bids appear.
+  const prewarmDoneRef = useRef(false);
+  useEffect(() => {
+    if (!auction || prewarmDoneRef.current) return;
+    prewarmDoneRef.current = true;
+
+    const addresses: string[] = [auction.seller.toBase58()];
+    const bidder = auction.highestBidder?.toBase58();
+    if (bidder && bidder !== "11111111111111111111111111111111") {
+      addresses.push(bidder);
+    }
+    // Also prefetch all known depositors (bidders) in the background
+    const auctionPubkey = new PublicKey(id);
+    getAuctionBidders(l1Connection, auctionPubkey)
+      .then((bidders) => {
+        const all = [...addresses, ...bidders.map((b) => b.toBase58())];
+        prefetchProfiles([...new Set(all)]);
+      })
+      .catch(() => {
+        // Fallback: just prefetch seller + highest bidder
+        prefetchProfiles(addresses);
+      });
+  }, [auction, id, l1Connection]);
 
   // Check ER delegation status
   const [isDelegated, setIsDelegated] = useState<boolean | null>(null);

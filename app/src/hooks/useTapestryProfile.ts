@@ -31,6 +31,24 @@ function cacheSet(key: string, value: ProfileWithCounts | null) {
 }
 
 // ---------------------------------------------------------------------------
+// Pre-warm: fetch multiple profiles into cache (fire-and-forget, no UI state)
+// Deduplicates against cache and in-flight requests.
+// ---------------------------------------------------------------------------
+
+const inflight = new Set<string>();
+
+export function prefetchProfiles(addresses: string[]): void {
+  for (const addr of addresses) {
+    if (profileCache.has(addr) || inflight.has(addr)) continue;
+    inflight.add(addr);
+    getProfile(addr)
+      .then((result) => cacheSet(addr, result))
+      .catch(() => cacheSet(addr, null))
+      .finally(() => inflight.delete(addr));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
