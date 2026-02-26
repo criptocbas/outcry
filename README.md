@@ -31,8 +31,9 @@ Traditional onchain auctions suffer from ~400ms block times. OUTCRY uses **Magic
 - **Anti-sniping** — late bids extend the auction timer
 - **Anti-shill** — sellers cannot bid on their own auctions (enforced onchain)
 - **Social layer** — profiles, follows, likes, and comments via Tapestry
-- **Compressed NFT badges** — Present, Contender, and Victor badges via Bubblegum
+- **Compressed NFT badges** — Contender and Victor badges via Bubblegum
 - **Automatic settlement** — end auction, undelegate, settle, and mint badges in one click
+- **Session keys (popup-free bidding)** — enable quick bidding with one click, then bid instantly with zero wallet popups
 - **Bid speed indicator** — every bid shows confirmation time (e.g. "confirmed in 42ms")
 - **Explorer links** — every transaction toast links directly to Solana Explorer
 - **ER fallback** — automatic L1 fallback when Magic Router is unavailable
@@ -57,13 +58,12 @@ Traditional onchain auctions suffer from ~400ms block times. OUTCRY uses **Magic
               │  (devnet)     │  │  (Ephemeral Rollup) │
               │               │  │                     │
               │ create_auction│  │ place_bid  (<50ms)  │
-              │ deposit       │  │ end_auction         │
-              │ start_auction │  │ undelegate_auction   │
-              │ delegate      │  │                     │
+              │ deposit       │  │ place_bid_session   │
+              │ start_auction │  │  (popup-free, <50ms)│
+              │ delegate      │  │ end_auction         │
+              │ create_session│  │ undelegate_auction   │
               │ settle_auction│  └─────────────────────┘
               │ claim_refund  │
-              │ claim_refund_ │
-              │  for          │
               │ cancel_auction│
               │ close_auction │
               │ forfeit       │
@@ -98,7 +98,10 @@ create_auction (L1)  ─── Artist escrows NFT, sets reserve price + duration
      │
      ├── delegate_auction (L1 → ER)  ─── AuctionState moves to Ephemeral Rollup
      │
+     ├── create_session (L1, optional)  ─── Enable popup-free bidding
+     │
      ├── place_bid (ER)  ─── Sub-50ms confirmations, anti-snipe extension
+     │     └── (or place_bid_session — same speed, zero wallet popups)
      │
      ├── end_auction (ER)  ─── Timer expired, status → Ended
      │
@@ -135,6 +138,7 @@ Created ──→ Active ──→ Ended ──→ Settled
 | `AuctionState` | `["auction", seller, nft_mint]` | Core auction data — delegated to ER during live bidding |
 | `AuctionVault` | `["vault", auction_state]` | Holds SOL deposits — **never** delegated |
 | `BidderDeposit` | `["deposit", auction_state, bidder]` | Per-bidder deposit tracking — stays on L1 |
+| `SessionToken` | `["session", auction_state, bidder]` | Links ephemeral browser key to real wallet for popup-free bidding — stays on L1 |
 
 ### Instructions
 
@@ -145,6 +149,8 @@ Created ──→ Active ──→ Ended ──→ Settled
 | `start_auction` | L1 | Set status to Active, start countdown timer |
 | `delegate_auction` | L1 | Delegate AuctionState to MagicBlock Ephemeral Rollup |
 | `place_bid` | ER | Update current bid + highest bidder (sub-50ms, no deposit check) |
+| `place_bid_session` | ER | Same as `place_bid` but signed by ephemeral session key (zero wallet popups) |
+| `create_session` | L1 | Register ephemeral browser key → real wallet link for session bidding |
 | `end_auction` | ER | Set status to Ended when timer expires |
 | `undelegate_auction` | ER→L1 | Commit final state back to L1 |
 | `settle_auction` | L1 | Transfer NFT to winner, distribute SOL to seller. Verifies winner's deposit >= bid |
@@ -166,6 +172,17 @@ Created ──→ Active ──→ Ended ──→ Settled
 - **ER fallback:** Transparent L1 fallback when Magic Router is unavailable
 - **Permissionless refunds:** Sellers (or anyone) can trigger refunds for bidders via `claim_refund_for`, unblocking auction closure without waiting for each bidder to claim individually
 - **Force close:** 7-day grace period prevents permanent account lockup from unclaimed deposits
+- **Session keys:** Ephemeral browser keypairs linked to real wallets via `SessionToken` PDA — bidder identity is always the real wallet for settlement and deposit matching
+
+### Session Keys (Popup-Free Bidding)
+
+In a competitive bidding war, wallet approval popups kill the real-time feel. OUTCRY implements session keys to eliminate this friction:
+
+1. **Enable session** — User clicks "Enable Quick Bidding" (one wallet popup): deposits SOL, funds an ephemeral browser keypair, and creates a `SessionToken` PDA on L1 linking the ephemeral key to their real wallet
+2. **Bid instantly** — Every subsequent bid is signed by the ephemeral key and sent directly to the ER — zero popups, ~50ms per bid
+3. **Identity preserved** — `place_bid_session` reads the `SessionToken` to set `highest_bidder` to the real wallet, so settlement, deposit verification, and anti-shill checks all work identically to normal bids
+
+The `SessionToken` PDA lives on L1 (never delegated). The ER clones it as a read-only account when processing `place_bid_session`. If the user refreshes the page, the ephemeral key is lost and they re-enable with one popup (`init_if_needed` updates the session signer).
 
 See [SECURITY.md](SECURITY.md) for the full threat model and access control matrix.
 
@@ -246,7 +263,7 @@ anchor deploy --provider.cluster https://devnet.helius-rpc.com/?api-key=YOUR_KEY
 - **BidHistory** — Animated bid feed with Tapestry username resolution
 - **AuctionCard** — Compact auction preview with NFT art, live timer, bid count
 - **ProfileBadge** — Avatar + username with Tapestry profile lookup
-- **BadgeGrid** — Compressed NFT badge display (Present / Contender / Victor)
+- **BadgeGrid** — Compressed NFT badge display (Contender / Victor)
 - **CommentSection** — Real-time comments with avatar hashing
 - **FollowButton** — Follow/unfollow with hover state ("Following" → "Unfollow")
 - **LikeButton** — Optimistic like toggle with count polling
@@ -320,6 +337,7 @@ app/src/
 │   ├── useFollowStatus.ts        # Follow/unfollow with rapid-click guard
 │   ├── useAuctionLike.ts         # Like with optimistic updates + rollback
 │   ├── useAuctionComments.ts     # Real-time comments
+│   ├── useSessionBidding.ts     # Ephemeral keypair + popup-free session bidding
 │   └── useBadges.ts              # Badge fetching via DAS
 ├── lib/
 │   ├── constants.ts              # Program IDs, RPC endpoints, seeds
@@ -374,7 +392,6 @@ Complete social layer integration:
 Bubblegum-powered badge system:
 - **Victor** — Awarded to the auction winner (includes winning bid amount)
 - **Contender** — Awarded to all other bidders
-- **Present** — (Stretch) Awarded to spectators
 - Merkle tree: depth 14 (16,384 max badges), canopy depth 11
 - On-chain verification: badge endpoint checks auction is in Settled status before minting
 - Deduplication: in-memory guard prevents double-minting per auction
@@ -475,11 +492,12 @@ Here's the full end-to-end flow on devnet:
 2. **Create auction** — Select an NFT from your wallet, set reserve price (e.g. 1 SOL), duration (e.g. 10 min)
 3. **Start + Delegate** — Click "Go Live" to start the timer and delegate to the Ephemeral Rollup
 4. **Deposit SOL** — From a second wallet, deposit enough SOL to cover your maximum bid
-5. **Place bids** — Bid in real-time — each bid confirms in under 50ms with a speed indicator
-6. **Anti-snipe** — Bid in the last 5 minutes to see the timer extend
-7. **Settle** — After the timer expires, click "Settle" to transfer the NFT and distribute SOL
-8. **Claim refund** — Losing bidders click "Claim Refund", or the seller clicks "Refund All Bidders" to return all deposits at once
-9. **Badges** — Winner receives a Victor badge, bidders receive Contender badges (visible on profile page)
+5. **Enable Quick Bidding** (optional) — Click "Enable Quick Bidding" for popup-free bids (one wallet approval)
+6. **Place bids** — Bid in real-time — each bid confirms in under 50ms with a speed indicator (zero popups with session keys)
+7. **Anti-snipe** — Bid in the last 5 minutes to see the timer extend
+8. **Settle** — After the timer expires, click "Settle" to transfer the NFT and distribute SOL
+9. **Claim refund** — Losing bidders click "Claim Refund", or the seller clicks "Refund All Bidders" to return all deposits at once
+10. **Badges** — Winner receives a Victor badge, bidders receive Contender badges (visible on profile page)
 
 Every transaction shows an explorer link in the toast notification for on-chain verification.
 

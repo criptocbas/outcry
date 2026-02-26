@@ -33,7 +33,7 @@ Artists list NFTs, collectors compete in real-time, spectators watch. Every bid 
 5. **English auction only for MVP** — Dutch and Sealed-bid are stretch goals.
 6. **Standard NFTs first** — pNFT (Token Auth Rules) royalty enforcement is a stretch goal.
 7. **No custom backend** — Magic Router for real-time, Tapestry REST for social, Umi for badges.
-8. **Session keys are stretch** — MVP requires wallet approval per bid.
+8. **Session keys implemented** — Ephemeral keypair + SessionToken PDA enables popup-free bidding via `place_bid_session`.
 
 ## Program Design
 
@@ -42,6 +42,7 @@ Artists list NFTs, collectors compete in real-time, spectators watch. Every bid 
 - `AuctionState` — Seeds: `[b"auction", seller, nft_mint]`. Fixed-size (no Vec). Delegated to ER during live bidding. Tracks current_bid, highest_bidder, end_time, status, bid_count.
 - `AuctionVault` — Seeds: `[b"vault", auction_state]`. NEVER delegated. Holds SOL deposits on L1.
 - `BidderDeposit` — Seeds: `[b"deposit", auction_state, bidder]`. Per-bidder deposit tracking. Stays on L1, never delegated. Uses `init_if_needed`.
+- `SessionToken` — Seeds: `[b"session", auction_state, bidder]`. Links ephemeral browser keypair to real wallet for popup-free bidding. Stays on L1 (ER clones read-only).
 
 ### Instructions
 
@@ -50,14 +51,20 @@ Artists list NFTs, collectors compete in real-time, spectators watch. Every bid 
 | create_auction | L1 | Init state + vault, escrow NFT |
 | deposit | L1 | Bidder deposits SOL to vault (works anytime, even during ER delegation) |
 | start_auction | L1 | Set Active, start timer |
-| delegate_auction | L1 | Delegate AuctionState to ER (separate from start for testability) |
+| delegate_auction | L1 | Delegate AuctionState to ER (requires Active status) |
 | place_bid | ER | Update current_bid + highest_bidder (sub-50ms, no deposit check) |
-| end_auction | ER | Set Ended status |
-| undelegate_auction | ER→L1 | Commit state back to L1 |
-| settle_auction | L1 | Transfer NFT to winner, distribute SOL (verifies winner deposit >= bid) |
+| place_bid_session | ER | Same as place_bid but signed by ephemeral session key |
+| end_auction | ER | Set Ended status (permissionless, anyone can crank) |
+| undelegate_auction | ER→L1 | Commit state back to L1 (permissionless) |
+| settle_auction | L1 | Transfer NFT to winner, distribute SOL with royalties (verifies winner deposit >= bid) |
+| forfeit_auction | L1 | Handle winner default — NFT to seller, deposit slashed (permissionless) |
 | claim_refund | L1 | Losers reclaim deposits from BidderDeposit PDA |
-| cancel_auction | L1 | Seller cancels (only if Created, no bids) |
-| close_auction | L1 | Close accounts, reclaim rent |
+| claim_refund_for | L1 | Permissionless: refund a specific bidder (anyone pays gas) |
+| cancel_auction | L1 | Seller cancels (only if Created or Ended with 0 bids) |
+| close_auction | L1 | Close accounts, reclaim rent (requires empty vault) |
+| force_close_auction | L1 | Seller sweeps unclaimed deposits after 7-day grace period |
+| create_session | L1 | Register ephemeral key → real wallet link for session bidding |
+| emergency_refund | L1 | Recover deposits stuck in ER-delegated auctions |
 
 ### Instruction Flow
 
@@ -67,11 +74,12 @@ create_auction (L1)
   → start_auction (L1)
   → delegate_auction (L1)
   → deposit (L1, still works!)
-  → place_bid (ER, sub-50ms)
+  → create_session (L1, optional — enables popup-free bidding)
+  → place_bid (ER, sub-50ms) OR place_bid_session (ER, ephemeral key)
   → end_auction (ER)
   → undelegate_auction (ER→L1)
-  → settle_auction (L1, checks deposit)
-  → claim_refund (L1, losers)
+  → settle_auction (L1, checks deposit + enforces royalties)
+  → claim_refund (L1, losers) OR claim_refund_for (L1, permissionless)
 ```
 
 ### Status Flow
@@ -93,9 +101,10 @@ Seller cannot bid on their own auction (enforced on-chain via `SellerCannotBid` 
 
 1. Verify winner's BidderDeposit >= winning bid
 2. Deduct winning bid from winner's deposit
-3. Transfer SOL from vault to seller (minus protocol fee)
-4. Transfer NFT from escrow to winner
-5. Losers claim refunds separately via `claim_refund`
+3. Calculate royalties from Metaplex metadata (seller_fee_basis_points, creator splits)
+4. Transfer SOL: royalties to creators, protocol fee to treasury, remainder to seller
+5. Transfer NFT from escrow to winner
+6. Losers claim refunds separately via `claim_refund` or `claim_refund_for`
 
 ## Tech Stack
 
@@ -217,6 +226,7 @@ MAX_AUCTION_DURATION = 604_800 (7 days)
 - `app/src/hooks/useAuction.ts` — Single auction fetch + WebSocket subscription
 - `app/src/hooks/useAuctions.ts` — All auctions listing (devnet + Magic Router)
 - `app/src/hooks/useBidderDeposit.ts` — User's BidderDeposit PDA fetch
+- `app/src/hooks/useSessionBidding.ts` — Ephemeral keypair + session-based popup-free bidding
 - `app/src/lib/program.ts` — Anchor program + PDA helpers
 - `app/src/lib/magic-router.ts` — ConnectionMagicRouter singleton
 - `app/src/lib/constants.ts` — Program ID, seeds, endpoints
@@ -232,17 +242,18 @@ MAX_AUCTION_DURATION = 604_800 (7 days)
 
 If time runs short, cut from the bottom:
 1. ~~Core program (L1 auction lifecycle)~~ — DONE
-2. ~~MagicBlock ER integration~~ — DONE (testing in progress)
+2. ~~MagicBlock ER integration~~ — DONE
 3. ~~Frontend auction room~~ — DONE
 4. ~~Tapestry social layer~~ — DONE
 5. ~~Bubblegum badges~~ — DONE
-6. Visual polish + animations — IN PROGRESS
-7. End-to-end devnet testing — NEEDED
-8. Royalty enforcement at settlement — NEEDED
-9. Dutch auction format — STRETCH
-10. pNFT royalty enforcement — STRETCH
-11. Session keys (gasless bidding) — STRETCH
-12. Sealed-bid (TEE) — STRETCH
+6. ~~Visual polish + animations~~ — DONE
+7. ~~Royalty enforcement at settlement~~ — DONE (Metaplex metadata royalties)
+8. ~~Session keys (popup-free bidding)~~ — DONE
+9. ~~Permissionless refunds + emergency refund~~ — DONE
+10. End-to-end devnet testing — IN PROGRESS
+11. Dutch auction format — STRETCH
+12. pNFT royalty enforcement (Token Auth Rules) — STRETCH
+13. Sealed-bid (TEE) — STRETCH
 
 ## Design Language
 
