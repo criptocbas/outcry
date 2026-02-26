@@ -590,8 +590,9 @@ export default function AuctionRoomPage({
       } catch (settleErr: unknown) {
         console.error("[handleSettle] settle error:", settleErr);
         const settleMsg = settleErr instanceof Error ? settleErr.message : String(settleErr);
-        // If settlement failed (likely insufficient deposit), try forfeit
-        if (settleMsg.includes("InsufficientDeposit") || settleMsg.includes("0x1776")) {
+        // If settlement failed due to deposit issues (insufficient, missing, or uninitialized), try forfeit
+        if (settleMsg.includes("InsufficientDeposit") || settleMsg.includes("0x1776")
+            || settleMsg.includes("AccountNotInitialized") || settleMsg.includes("3012")) {
           setProgressLabel("Winner defaulted — forfeiting auction...");
           const forfeitSig = await actions.forfeitAuction(
             auctionPubkey,
