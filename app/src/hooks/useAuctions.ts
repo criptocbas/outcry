@@ -125,7 +125,14 @@ export function useAuctions(): UseAuctionsReturn {
           }
         })
       );
-      const mapped: AuctionWithKey[] = results.filter((r): r is AuctionWithKey => r !== null);
+      // Hide known stuck/broken auctions (ER delegation orphaned)
+      const HIDDEN_AUCTIONS = new Set([
+        "Hr1iDC1G19qGaNydq2QV5aazKA6HG9dqi22w3GUV7Vzn",
+      ]);
+
+      const mapped: AuctionWithKey[] = results
+        .filter((r): r is AuctionWithKey => r !== null)
+        .filter((a) => !HIDDEN_AUCTIONS.has(a.publicKey.toBase58()));
 
       mapped.sort(sortAuctions);
 
