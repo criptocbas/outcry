@@ -4,6 +4,7 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use crate::{
     constants::*,
     errors::OutcryError,
+    events::AuctionForceClosed,
     state::{AuctionState, AuctionStatus, AuctionVault},
 };
 
@@ -88,11 +89,12 @@ pub fn handle_force_close_auction(ctx: Context<ForceCloseAuction>) -> Result<()>
     let rent = Rent::get()?;
     let vault_rent = rent.minimum_balance(vault_info.data_len());
 
+    let mut drained: u64 = 0;
     if vault_lamports > vault_rent {
-        let drain_amount = vault_lamports - vault_rent;
+        drained = vault_lamports - vault_rent;
         // Transfer via direct lamport manipulation (vault is a PDA we own)
-        **vault_info.try_borrow_mut_lamports()? -= drain_amount;
-        **ctx.accounts.seller.to_account_info().try_borrow_mut_lamports()? += drain_amount;
+        **vault_info.try_borrow_mut_lamports()? -= drained;
+        **ctx.accounts.seller.to_account_info().try_borrow_mut_lamports()? += drained;
     }
 
     // Close escrow token account via PDA-signed CPI — must happen before
@@ -116,6 +118,12 @@ pub fn handle_force_close_auction(ctx: Context<ForceCloseAuction>) -> Result<()>
         },
         signer_seeds,
     ))?;
+
+    emit!(AuctionForceClosed {
+        auction: ctx.accounts.auction_state.key(),
+        seller: ctx.accounts.seller.key(),
+        drained_lamports: drained,
+    });
 
     // AuctionState and AuctionVault are closed by Anchor's `close` constraint.
 

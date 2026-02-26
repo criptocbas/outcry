@@ -3,6 +3,8 @@ use ephemeral_rollups_sdk::anchor::delegate;
 use ephemeral_rollups_sdk::cpi::DelegateConfig;
 
 use crate::constants::*;
+use crate::errors::OutcryError;
+use crate::state::{AuctionState, AuctionStatus};
 
 /// Delegates the AuctionState PDA to the MagicBlock Ephemeral Rollup.
 /// Called after start_auction. Sends to base layer (L1).
@@ -27,6 +29,17 @@ pub struct DelegateAuction<'info> {
 }
 
 pub fn handle_delegate_auction(ctx: Context<DelegateAuction>, nft_mint: Pubkey) -> Result<()> {
+    // Verify auction is Active before delegating (AccountInfo doesn't support typed constraints)
+    let data = ctx.accounts.auction_state.try_borrow_data()?;
+    let mut slice: &[u8] = &data;
+    let auction = AuctionState::try_deserialize(&mut slice)
+        .map_err(|_| error!(OutcryError::InvalidAuctionStatus))?;
+    require!(
+        auction.status == AuctionStatus::Active,
+        OutcryError::InvalidAuctionStatus
+    );
+    drop(data);
+
     ctx.accounts.delegate_auction_state(
         &ctx.accounts.seller,
         &[

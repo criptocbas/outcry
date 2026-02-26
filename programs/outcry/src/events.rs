@@ -64,3 +64,10 @@ pub struct AuctionCancelled {
     pub auction: Pubkey,
     pub seller: Pubkey,
 }
+
+#[event]
+pub struct AuctionForceClosed {
+    pub auction: Pubkey,
+    pub seller: Pubkey,
+    pub drained_lamports: u64,
+}

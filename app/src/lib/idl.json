@@ -2549,6 +2549,19 @@
       ]
     },
     {
+      "name": "AuctionForceClosed",
+      "discriminator": [
+        147,
+        156,
+        177,
+        195,
+        52,
+        180,
+        43,
+        131
+      ]
+    },
+    {
       "name": "AuctionSettled",
       "discriminator": [
         61,
@@ -2831,6 +2844,26 @@
           {
             "name": "total_bids",
             "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuctionForceClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "auction",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "drained_lamports",
+            "type": "u64"
           }
         ]
       }

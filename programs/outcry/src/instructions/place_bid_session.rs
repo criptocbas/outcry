@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::SESSION_SEED,
+    constants::{MAX_EXTENSION_SECONDS, SESSION_SEED},
     errors::OutcryError,
     events::BidPlaced,
     state::{AuctionState, AuctionStatus, SessionToken},
@@ -73,7 +73,7 @@ pub fn handle_place_bid_session(ctx: Context<PlaceBidSession>, amount: u64) -> R
         .checked_sub(clock.unix_timestamp)
         .ok_or(OutcryError::ArithmeticOverflow)?;
     if time_remaining < auction.extension_window as i64 {
-        let max_extension = std::cmp::min(auction.duration_seconds as i64, 3600);
+        let max_extension = std::cmp::min(auction.duration_seconds as i64, MAX_EXTENSION_SECONDS);
         let max_end_time = auction
             .start_time
             .checked_add(auction.duration_seconds as i64)
