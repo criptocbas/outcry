@@ -146,6 +146,7 @@ export default function AuctionRoomPage({
   const [progressLabel, setProgressLabel] = useState<string | null>(null);
   const [bidFlash, setBidFlash] = useState(false);
   const [settleConfirm, setSettleConfirm] = useState(false);
+  const [settleFailed, setSettleFailed] = useState(false);
   const [prevBid, setPrevBid] = useState<number | null>(null);
   const [prevHighestBidder, setPrevHighestBidder] = useState<string | null>(null);
   const [bidHistory, setBidHistory] = useState<Array<{ bidder: string; amount: number; timestamp: number }>>([]);
@@ -669,6 +670,10 @@ export default function AuctionRoomPage({
       const msg = extractErrorMessage(err, "Settlement failed");
       console.error("Settlement error:", err);
       addToast(msg, "error");
+      // If settle failed while auction is still delegated, show emergency refund option
+      if (isDelegated) {
+        setSettleFailed(true);
+      }
     } finally {
       setActionLoading(false);
       setProgressLabel(null);
@@ -1297,8 +1302,8 @@ export default function AuctionRoomPage({
                 </button>
               )}
 
-              {/* Emergency refund — only when auction is stuck (delegated + expired + still Active) */}
-              {isDelegated && isActive && timerExpired && userDeposit != null && userDeposit > 0 && publicKey && (
+              {/* Emergency refund — only after settle has failed on a delegated auction */}
+              {settleFailed && userDeposit != null && userDeposit > 0 && publicKey && (
                 <button
                   onClick={handleEmergencyRefund}
                   disabled={actionLoading}
