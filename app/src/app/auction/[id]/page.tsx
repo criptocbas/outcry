@@ -675,6 +675,7 @@ export default function AuctionRoomPage({
   // Refund all bidders (seller triggers permissionless refunds)
   // -------------------------------------------------------------------------
   const [refundProgress, setRefundProgress] = useState<string | null>(null);
+  const [allRefunded, setAllRefunded] = useState(false);
   const handleRefundAll = useCallback(async () => {
     if (!auction || !publicKey) return;
     setActionLoading(true);
@@ -683,11 +684,9 @@ export default function AuctionRoomPage({
       const auctionPubkey = new PublicKey(id);
       const bidders = await getAuctionBidders(l1Connection, auctionPubkey);
 
-      // Skip the winner (their deposit was used at settlement) and filter to existing accounts
-      const winnerKey = auction.highestBidder?.toBase58();
+      // Include ALL bidders (including winner — they may have excess deposit after settlement)
       const activeBidders: PublicKey[] = [];
       for (const bidder of bidders) {
-        if (bidder.toBase58() === winnerKey) continue;
         const [depositPDA] = getDepositPDA(auctionPubkey, bidder);
         const info = await l1Connection.getAccountInfo(depositPDA);
         if (info) activeBidders.push(bidder);
@@ -695,6 +694,7 @@ export default function AuctionRoomPage({
 
       if (activeBidders.length === 0) {
         addToast("No outstanding deposits to refund", "success");
+        setAllRefunded(true);
         return;
       }
 
@@ -723,6 +723,7 @@ export default function AuctionRoomPage({
       }
 
       addToast(`All refunds complete (${refunded}/${activeBidders.length})`, "success");
+      setAllRefunded(true);
       await refetch();
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "Refund all failed");
@@ -1236,10 +1237,19 @@ export default function AuctionRoomPage({
                   </p>
                   <button
                     onClick={handleRefundAll}
-                    disabled={actionLoading}
-                    className="flex h-11 w-full items-center justify-center rounded-md border border-gold/30 text-xs font-medium tracking-[0.1em] text-gold uppercase transition-all hover:border-gold hover:bg-gold/5 disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={actionLoading || allRefunded}
+                    className={`flex h-11 w-full items-center justify-center gap-2 rounded-md border text-xs font-medium tracking-[0.1em] uppercase transition-all disabled:cursor-not-allowed ${
+                      allRefunded
+                        ? "border-emerald-500/30 text-emerald-400/60"
+                        : "border-gold/30 text-gold hover:border-gold hover:bg-gold/5 disabled:opacity-40"
+                    }`}
                   >
-                    {actionLoading && refundProgress ? refundProgress : actionLoading ? <Spinner /> : "Step 1 — Refund All Bidders"}
+                    {allRefunded ? (
+                      <>
+                        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                        All Bidders Refunded
+                      </>
+                    ) : actionLoading && refundProgress ? refundProgress : actionLoading ? <Spinner /> : "Step 1 — Refund All Bidders"}
                   </button>
                   <button
                     onClick={handleClose}
