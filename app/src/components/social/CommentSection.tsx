@@ -53,15 +53,21 @@ export default function CommentSection({ auctionId, headerRight }: CommentSectio
   const [inputText, setInputText] = useState("");
   const [posting, setPosting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastPostedRef = useRef<string>("");
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!inputText.trim() || !userProfileId || posting) return;
+      const text = inputText.trim();
+      if (!text || !userProfileId || posting) return;
+
+      // Prevent accidental double-posts of the same message
+      if (text === lastPostedRef.current) return;
 
       setPosting(true);
       try {
-        await postComment(inputText.trim());
+        await postComment(text);
+        lastPostedRef.current = text;
         setInputText("");
         inputRef.current?.focus();
       } catch {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTapestryProfile } from "@/hooks/useTapestryProfile";
 import { truncateAddress, formatSOL } from "@/lib/utils";
@@ -41,6 +42,13 @@ function BidderName({ wallet }: { wallet: string }) {
 
 export default function BidHistory({ bids }: BidHistoryProps) {
   const sorted = [...bids].sort((a, b) => b.timestamp - a.timestamp);
+
+  // Tick every 10s so relative timestamps stay fresh
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 10_000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="flex flex-col">
