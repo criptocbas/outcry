@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, DM_Sans } from "next/font/google";
 import Providers from "@/providers/Providers";
 import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import "./globals.css";
 
@@ -59,6 +60,7 @@ export default function RootLayout({
           <main className="pt-16">
             <ErrorBoundary>{children}</ErrorBoundary>
           </main>
+          <Footer />
         </Providers>
       </body>
     </html>

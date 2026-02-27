@@ -268,8 +268,7 @@ export default function HomePage() {
             <motion.div
               variants={containerVariants}
               initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-40px" }}
+              animate="visible"
               className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
             >
               {paginated.map((item) => {
