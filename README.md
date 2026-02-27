@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://outcry-criptocbas-projects.vercel.app/"><strong>Live Demo</strong></a> &middot;
+  <a href="https://outcry.vercel.app/"><strong>Live Demo</strong></a> &middot;
   <a href="#architecture">Architecture</a> &middot;
   <a href="#getting-started">Getting Started</a> &middot;
   <a href="#program">Program</a> &middot;
