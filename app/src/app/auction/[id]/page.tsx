@@ -373,7 +373,7 @@ export default function AuctionRoomPage({
           setProgressLabel("Quick bid...");
           const { sendMs } = await session.sessionBid(new PublicKey(id), bidLamports);
           setLastBidSpeedMs(sendMs);
-          addToast(`Quick bid: ${formatSOL(bidLamports)} SOL — ${sendMs}ms`, "success");
+          addToast(`Quick bid: ${formatSOL(bidLamports)} SOL`, "success");
           await refetch();
           return;
         }
@@ -394,7 +394,7 @@ export default function AuctionRoomPage({
         setProgressLabel("Placing bid...");
         const { sendMs } = await actions.placeBid(new PublicKey(id), new BN(bidLamports));
         setLastBidSpeedMs(sendMs);
-        addToast(`Bid placed: ${formatSOL(bidLamports)} SOL — ${sendMs}ms via Ephemeral Rollup`, "success");
+        addToast(`Bid placed: ${formatSOL(bidLamports)} SOL`, "success");
         await refetch();
       } catch (err: unknown) {
         const msg = extractErrorMessage(err, "Bid failed");
