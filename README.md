@@ -33,9 +33,11 @@ Traditional onchain auctions suffer from ~400ms block times. OUTCRY uses **Magic
 - **Anti-shill** — sellers cannot bid on their own auctions (enforced onchain)
 - **Social layer** — profiles, follows, likes, and comments via Tapestry
 - **Compressed NFT badges** — Contender and Victor badges via Bubblegum
+- **Royalty enforcement** — Metaplex metadata royalties distributed to creators at settlement, with a visual breakdown
 - **Automatic settlement** — end auction, undelegate, settle, and mint badges in one click
 - **Session keys (popup-free bidding)** — enable quick bidding with one click, then bid instantly with zero wallet popups
-- **Bid speed indicator** — every bid shows confirmation time (e.g. "confirmed in 42ms")
+- **Flexible top-ups** — deposit more SOL mid-auction with a quick button or custom amount, without leaving the bid panel
+- **ER performance card** — live MagicBlock latency indicator shows round-trip confirmation time per bid
 - **Explorer links** — every transaction toast links directly to Solana Explorer
 - **ER fallback** — automatic L1 fallback when Magic Router is unavailable
 - **Permissionless refunds** — sellers can refund all bidders in one click, unblocking auction closure
@@ -154,7 +156,7 @@ Created ──→ Active ──→ Ended ──→ Settled
 | `create_session` | L1 | Register ephemeral browser key → real wallet link for session bidding |
 | `end_auction` | ER | Set status to Ended when timer expires |
 | `undelegate_auction` | ER→L1 | Commit final state back to L1 |
-| `settle_auction` | L1 | Transfer NFT to winner, distribute SOL to seller. Verifies winner's deposit >= bid |
+| `settle_auction` | L1 | Transfer NFT to winner, distribute SOL (royalties to creators, protocol fee, remainder to seller). Verifies winner's deposit >= bid |
 | `claim_refund` | L1 | Losing bidders reclaim their BidderDeposit |
 | `claim_refund_for` | L1 | Permissionless refund — anyone can trigger a refund to a specific bidder |
 | `cancel_auction` | L1 | Seller cancels (only if Created, no bids placed) |
@@ -259,9 +261,9 @@ anchor deploy --provider.cluster https://devnet.helius-rpc.com/?api-key=YOUR_KEY
 
 ### Key Components
 
-- **BidPanel** — Unified deposit + bid flow with quick-bid buttons, minimum bid validation, and multi-step progress labels
+- **BidPanel** — Unified deposit + bid flow with quick-bid buttons, minimum bid validation, mid-auction top-ups, and multi-step progress labels
 - **CountdownTimer** — Real-time countdown with color states (white → amber → red pulse)
-- **BidHistory** — Animated bid feed with Tapestry username resolution
+- **BidHistory** — Animated bid feed with Tapestry username resolution and live-ticking relative timestamps
 - **AuctionCard** — Compact auction preview with NFT art, live timer, bid count
 - **ProfileBadge** — Avatar + username with Tapestry profile lookup
 - **BadgeGrid** — Compressed NFT badge display (Contender / Victor)
@@ -324,6 +326,7 @@ app/src/
 │       └── tapestry/             # Proxied Tapestry endpoints
 ├── components/
 │   ├── layout/Header.tsx         # Navigation + wallet connect
+│   ├── layout/Footer.tsx         # Hackathon credits + technology links
 │   ├── auction/                  # Auction-specific components
 │   ├── social/                   # Profile, follow, like, comment
 │   ├── badges/                   # Badge display components
@@ -377,7 +380,7 @@ Full English auction implementation with:
 - Anti-sniping (5-minute extension on late bids)
 - Anti-shill bidding (seller can't bid, enforced onchain)
 - NFT escrow during auction
-- Automatic royalty distribution at settlement via Metaplex metadata
+- Automatic royalty distribution at settlement via Metaplex metadata (with visible breakdown UI)
 
 ### Tapestry ($5K) — Social profiles and discovery
 
@@ -407,6 +410,8 @@ End-to-end auction platform with polished UX:
 - Toast notifications with accessibility (`role="alert"`)
 - Two-click confirmation for settlement
 - Outbid notifications
+- Settlement breakdown showing royalty distribution, protocol fee, and seller proceeds
+- Live ER performance card (MagicBlock latency per bid)
 - Wallet-optional browsing (read-only mode without wallet)
 
 ---
@@ -494,9 +499,9 @@ Here's the full end-to-end flow on devnet:
 3. **Start + Delegate** — Click "Go Live" to start the timer and delegate to the Ephemeral Rollup
 4. **Deposit SOL** — From a second wallet, deposit enough SOL to cover your maximum bid
 5. **Enable Quick Bidding** (optional) — Click "Enable Quick Bidding" for popup-free bids (one wallet approval)
-6. **Place bids** — Bid in real-time — each bid confirms in under 50ms with a speed indicator (zero popups with session keys)
+6. **Place bids** — Bid in real-time — the ER performance card shows live confirmation latency (zero popups with session keys)
 7. **Anti-snipe** — Bid in the last 5 minutes to see the timer extend
-8. **Settle** — After the timer expires, click "Settle" to transfer the NFT and distribute SOL
+8. **Settle** — After the timer expires, click "Settle" to transfer the NFT and distribute SOL (with royalty breakdown)
 9. **Claim refund** — Losing bidders click "Claim Refund", or the seller clicks "Refund All Bidders" to return all deposits at once
 10. **Badges** — Winner receives a Victor badge, bidders receive Contender badges (visible on profile page)
 
