@@ -35,10 +35,16 @@ interface BidPanelProps {
   onTopUpDeposit?: (amount: number) => void;
 }
 
+// Cap at 1B lamports (~1 SOL on devnet is plenty) to prevent overflow
+// when converting to BN for program calls. Number.MAX_SAFE_INTEGER is
+// ~9_007_199 SOL — we use a much lower practical ceiling.
+const MAX_BID_LAMPORTS = 1_000_000 * 1_000_000_000; // 1 000 000 SOL
+
 function parseSolToLamports(sol: string): number {
   const parsed = parseFloat(sol);
   if (isNaN(parsed) || parsed < 0) return 0;
-  return Math.round(parsed * 1_000_000_000);
+  const lamports = Math.round(parsed * 1_000_000_000);
+  return Math.min(lamports, MAX_BID_LAMPORTS);
 }
 
 export default function BidPanel({

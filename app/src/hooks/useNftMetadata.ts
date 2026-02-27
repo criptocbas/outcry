@@ -148,21 +148,28 @@ export function useNftMetadata(mintAddress: string | null): {
           return;
         }
 
-        // Fetch off-chain JSON metadata
+        // Fetch off-chain JSON metadata (with 5s timeout to avoid hanging
+        // on slow IPFS gateways or unresponsive metadata servers)
         let image: string | null = null;
         let description: string | null = null;
         let offChainName = parsed.name;
 
         try {
-          const res = await fetch(parsed.uri);
-          if (res.ok) {
-            const json = await res.json();
-            image = json.image || json.image_url || null;
-            description = json.description || null;
-            if (json.name) offChainName = json.name;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          try {
+            const res = await fetch(parsed.uri, { signal: controller.signal });
+            if (res.ok) {
+              const json = await res.json();
+              image = json.image || json.image_url || null;
+              description = json.description || null;
+              if (json.name) offChainName = json.name;
+            }
+          } finally {
+            clearTimeout(timeoutId);
           }
         } catch {
-          // Off-chain fetch failed — we still have on-chain name/symbol
+          // Off-chain fetch failed or timed out — we still have on-chain name/symbol
         }
 
         if (cancelled) return;

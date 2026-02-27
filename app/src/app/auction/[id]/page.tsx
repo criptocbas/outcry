@@ -22,7 +22,7 @@ import Spinner from "@/components/ui/Spinner";
 import { useTapestryProfile, prefetchProfiles } from "@/hooks/useTapestryProfile";
 import { useNftMetadata } from "@/hooks/useNftMetadata";
 import { getProfile, createContent } from "@/lib/tapestry";
-import { getAuctionBidders, getDepositPDA, getReadOnlyProgram } from "@/lib/program";
+import { getAuctionBidders, getDepositPDA, getMetadataPDA, getReadOnlyProgram, parseMetadataCreators } from "@/lib/program";
 import { DELEGATION_PROGRAM_ID, DEVNET_RPC, MAGIC_ROUTER_RPC } from "@/lib/constants";
 import NftImage from "@/components/auction/NftImage";
 
@@ -1185,6 +1185,14 @@ export default function AuctionRoomPage({
               </motion.div>
             )}
 
+            {/* Settlement breakdown — shows royalty distribution */}
+            {isSettled && auction.currentBid.toNumber() > 0 && (
+              <SettlementBreakdown
+                nftMint={auction.nftMint.toBase58()}
+                winningBid={auction.currentBid.toNumber()}
+              />
+            )}
+
             {/* Bid Panel — unified deposit+bid flow (during Active, timer not expired) */}
             {isActive && !isSeller && !timerExpired && (
               <BidPanel
@@ -1455,18 +1463,37 @@ export default function AuctionRoomPage({
               )}
             </div>
 
+            {/* MagicBlock ER Performance — prominent display when ER is active */}
+            {isDelegated && lastBidSpeedMs !== null && (
+              <div className="relative overflow-hidden rounded-lg border border-emerald-500/30 bg-gradient-to-b from-emerald-500/10 to-transparent p-4">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.06),transparent_70%)]" />
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-semibold tracking-[0.15em] text-emerald-400 uppercase">
+                        MagicBlock Ephemeral Rollup
+                      </span>
+                      <span className="text-[10px] text-emerald-400/40">
+                        Sub-50ms bid confirmation
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-2xl font-bold tabular-nums text-emerald-400">
+                      {lastBidSpeedMs}<span className="text-sm font-medium text-emerald-400/60">ms</span>
+                    </span>
+                    <span className="text-[9px] text-emerald-400/30">last bid latency</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Bid History */}
             <div className="rounded-lg border border-charcoal-light bg-charcoal p-5">
-              {lastBidSpeedMs !== null && (
-                <div className="mb-3 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5">
-                  <span className="text-[10px] font-semibold tracking-wide text-emerald-400 uppercase">
-                    Last bid: {lastBidSpeedMs}ms
-                  </span>
-                  <span className="text-[10px] text-emerald-400/50">
-                    via Ephemeral Rollup
-                  </span>
-                </div>
-              )}
               <BidHistory bids={bidHistory} />
             </div>
 
@@ -1539,5 +1566,99 @@ function BidderName({ wallet }: { wallet: string }) {
     >
       {display}
     </a>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SettlementBreakdown — shows royalty distribution after settlement
+// ---------------------------------------------------------------------------
+
+const PROTOCOL_FEE_BPS = 250; // 2.5% — matches program constants.rs
+
+function SettlementBreakdown({ nftMint, winningBid }: { nftMint: string; winningBid: number }) {
+  const [breakdown, setBreakdown] = useState<{
+    royaltyBps: number;
+    royaltyAmount: number;
+    protocolFee: number;
+    sellerReceives: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!nftMint || winningBid <= 0) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const mint = new PublicKey(nftMint);
+        const [metadataPDA] = getMetadataPDA(mint);
+        const conn = new Connection(DEVNET_RPC, "confirmed");
+        const info = await conn.getAccountInfo(metadataPDA);
+        if (!info || cancelled) return;
+
+        const parsed = parseMetadataCreators(info.data as Buffer);
+        if (!parsed || cancelled) return;
+
+        const royaltyAmount = Math.floor((winningBid * parsed.sellerFeeBps) / 10_000);
+        const protocolFee = Math.floor((winningBid * PROTOCOL_FEE_BPS) / 10_000);
+        const sellerReceives = winningBid - royaltyAmount - protocolFee;
+
+        if (!cancelled) {
+          setBreakdown({
+            royaltyBps: parsed.sellerFeeBps,
+            royaltyAmount,
+            protocolFee,
+            sellerReceives: Math.max(0, sellerReceives),
+          });
+        }
+      } catch {
+        // Non-critical — breakdown just won't show
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [nftMint, winningBid]);
+
+  if (!breakdown) return null;
+
+  const rows = [
+    { label: "Sale Price", amount: winningBid, highlight: true },
+    { label: `Artist Royalties (${(breakdown.royaltyBps / 100).toFixed(1)}%)`, amount: -breakdown.royaltyAmount },
+    { label: "Protocol Fee (2.5%)", amount: -breakdown.protocolFee },
+    { label: "Seller Received", amount: breakdown.sellerReceives, highlight: true },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.2 }}
+      className="rounded-lg border border-charcoal-light bg-charcoal p-5"
+    >
+      <h3 className="mb-3 text-[10px] font-semibold tracking-[0.25em] text-cream/40 uppercase">
+        Settlement Breakdown
+      </h3>
+      <div className="space-y-2">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className={`flex items-center justify-between ${
+              row.highlight ? "text-cream/80" : "text-cream/40"
+            }`}
+          >
+            <span className="text-xs">{row.label}</span>
+            <span className={`text-xs font-medium tabular-nums ${
+              row.highlight ? "text-gold" : "text-cream/50"
+            }`}>
+              {row.amount < 0 ? "−" : ""}{formatSOL(Math.abs(row.amount))} SOL
+            </span>
+          </div>
+        ))}
+      </div>
+      {breakdown.royaltyBps > 0 && (
+        <p className="mt-3 border-t border-charcoal-light pt-3 text-center text-[10px] text-cream/20">
+          Royalties enforced on-chain via Metaplex metadata
+        </p>
+      )}
+    </motion.div>
   );
 }
